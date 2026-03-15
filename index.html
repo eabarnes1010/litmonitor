@@ -1,0 +1,2498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LitMonitor Earth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f0e;
+    --bg2: #141816;
+    --bg3: #1c201e;
+    --border: #2a2f2c;
+    --border2: #3a3f3c;
+    --text: #e8ede9;
+    --text2: #8fa494;
+    --text3: #5a6b5e;
+    --accent: #4ade80;
+    --accent2: #22c55e;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --score-hi: #4ade80;
+    --score-mid: #fbbf24;
+    --score-lo: #f87171;
+    --radius: 8px;
+    --font-mono: 'DM Mono', monospace;
+    --font-serif: 'Fraunces', serif;
+  }
+
+  [data-theme="light"] {
+    --bg: #f8faf8;
+    --bg2: #f0f4f1;
+    --bg3: #e4ebe5;
+    --border: #ccd6ce;
+    --border2: #adbcb0;
+    --text: #1a201c;
+    --text2: #3d5443;
+    --text3: #7a8e80;
+    --accent: #16a34a;
+    --accent2: #15803d;
+    --amber: #d97706;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --score-hi: #16a34a;
+    --score-mid: #d97706;
+    --score-lo: #dc2626;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 300;
+    font-style: italic;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); font-style: normal; }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  #status-line {
+    font-size: 11px;
+    color: var(--text3);
+    font-style: italic;
+  }
+
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0f0e;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: var(--accent2); border-color: var(--accent2); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text2);
+  }
+  .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
+  .btn-active { border-color: var(--amber) !important; color: var(--amber) !important; }
+
+  main { display: flex; flex: 1; padding-bottom: 48px; }
+
+  #app-footer {
+    text-align: center;
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    padding: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 280px;
+    min-width: 280px;
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+    height: calc(100vh - 57px);
+    position: sticky;
+    top: 57px;
+  }
+  /* When profile is expanded, release height constraint so content isn't clipped */
+  #sidebar.profile-open {
+    position: relative;
+    top: 0;
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .sidebar-section label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 8px;
+  }
+
+  textarea, input[type=text], input[type=password], input[type=number], select {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+    resize: none;
+  }
+  textarea:focus, input:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--bg2); }
+
+  #context-input    { height: 90px;  line-height: 1.6; }
+  #prioritize-input { height: 180px; line-height: 1.6; }
+  #methods-input    { height: 150px; line-height: 1.6; }
+  #downgrade-input  { height: 150px; line-height: 1.6; }
+
+  /* ── Collapsible profile group ── */
+  .profile-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .group-toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--accent2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0;
+    margin-bottom: 0;
+  }
+  .group-toggle:hover { color: var(--text); }
+  .toggle-icon {
+    display: inline-block;
+    transition: transform 0.2s ease;
+    font-style: normal;
+  }
+  .group-toggle.collapsed .toggle-icon { transform: rotate(-90deg); }
+  .group-content {
+    overflow: hidden;
+    max-height: 1400px;
+    transition: max-height 0.35s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .group-content.collapsed { max-height: 0; }
+
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .inline-label {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 0;
+  }
+  .setting-row .setting-label {
+    font-size: 11px;
+    color: var(--text2);
+    flex: 1;
+  }
+  .setting-row input[type="number"] {
+    width: 66px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  /* journal list */
+  #journal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 480px;
+    overflow-y: auto;
+  }
+  .journal-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .journal-item:hover { background: var(--bg3); }
+  .journal-item input[type=checkbox] { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  .journal-name { font-size: 11px; color: var(--text2); flex: 1; }
+  .journal-item.checked .journal-name { color: var(--text); }
+
+  /* source badge in journal list */
+  .journal-source {
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .journal-source.direct { color: var(--accent2); opacity: 0.7; }
+
+  /* API key */
+  .key-row { position: relative; }
+  .key-row input { padding-right: 36px; }
+  .key-toggle {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px;
+  }
+  .key-toggle:hover { color: var(--text2); }
+
+  /* ── Feed area ── */
+  #feed-area {
+    flex: 1;
+    padding: 24px 28px;
+    overflow-y: auto;
+  }
+
+  /* filter bar */
+  #filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  #filter-bar span {
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .filter-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--border2); color: var(--text2); }
+  .filter-btn.active { background: var(--bg3); border-color: var(--border2); color: var(--text); }
+  #search-box { flex: 1; min-width: 160px; max-width: 280px; height: 30px; padding: 0 10px; }
+  #min-score {
+    width: auto;
+    height: 30px;
+    padding: 3px 2px 3px 10px;
+    font-size: 11px;
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text3);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  #min-score:hover { border-color: var(--border2); color: var(--text2); }
+  #min-score:focus { border-color: var(--accent); color: var(--text); outline: none; }
+
+  /* stats bar */
+  #stats-bar {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-val { font-size: 18px; font-family: var(--font-serif); font-weight: 300; color: var(--text); }
+  .stat-label { font-size: 10px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* paper cards */
+  #papers-container { display: flex; flex-direction: column; gap: 10px; }
+
+  .paper-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    transition: border-color 0.15s, transform 0.1s;
+    position: relative;
+  }
+  .paper-card:hover { border-color: var(--border2); }
+  .paper-card.dismissed { opacity: 0.3; pointer-events: none; }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+
+  .score-badge {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 400;
+    border: 1px solid;
+  }
+  .score-hi { color: var(--score-hi); border-color: #4ade8044; background: #4ade8011; }
+  .score-mid { color: var(--score-mid); border-color: #fbbf2444; background: #fbbf2411; }
+  .score-lo { color: var(--score-lo); border-color: #f8717144; background: #f8717111; }
+
+  .card-meta { flex: 1; min-width: 0; }
+
+  .paper-title {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    font-weight: 300;
+    line-height: 1.4;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .paper-title a { color: inherit; text-decoration: none; }
+  .paper-title a:hover { color: var(--accent); }
+
+  .paper-authors {
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .paper-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+    border: 1px solid;
+  }
+  .tag-journal { color: var(--blue); border-color: #60a5fa33; background: #60a5fa0a; }
+  .tag-date { color: var(--text3); border-color: var(--border); background: transparent; }
+  .tag-new { color: var(--accent); border-color: #4ade8033; background: #4ade800a; }
+
+  .card-reason {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.6;
+    border-left: 2px solid var(--border2);
+    padding-left: 12px;
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .card-actions .btn { font-size: 10px; padding: 4px 10px; }
+  .dismiss-btn { color: var(--text3); }
+  .dismiss-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .card-abstract {
+    display: none;
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .card-abstract.open { display: block; }
+
+  /* empty / loading states */
+  #empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    color: var(--text3);
+  }
+  #empty-state .big { font-family: var(--font-serif); font-size: 36px; font-weight: 300; font-style: italic; margin-bottom: 12px; color: var(--text2); }
+  #empty-state p { font-size: 12px; line-height: 1.8; max-width: 380px; margin: 0 auto; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .progress-fill {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .progress-fill-inner {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .error-msg {
+    padding: 10px 14px;
+    background: #f8717110;
+    border: 1px solid #f8717133;
+    border-radius: var(--radius);
+    color: var(--red);
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+  /* scoring animation */
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .paper-card { animation: fadeSlideIn 0.25s ease both; }
+
+  /* tooltip */
+  .tooltip-wrap { position: relative; display: inline-block; }
+  .tooltip-wrap:hover .tooltip { display: block; }
+  .tooltip {
+    display: none;
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    z-index: 200;
+    pointer-events: none;
+  }
+
+  @media (max-width: 700px) {
+    #sidebar { display: none; }
+    #feed-area { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">Lit<span>Monitor</span><span style="color:var(--text2);font-style:normal"> Earth</span></div>
+    <div class="header-right">
+      <span id="status-line">ready</span>
+      <button class="btn btn-ghost" id="prefilter-btn" title="Use Haiku to pre-filter low-scoring papers before Sonnet scoring (saves cost)">⚡ Haiku Prefilter</button>
+      <button class="btn btn-primary" id="fetch-btn">↓ Fetch &amp; Score</button>
+      <button class="btn btn-ghost" id="stop-btn" style="display:none;border-color:var(--red);color:var(--red)" title="Stop after the current batch">■ Stop</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Sidebar -->
+    <aside id="sidebar">
+
+      <div class="sidebar-section">
+        <label>Anthropic API Key</label>
+        <div class="key-row">
+          <input type="password" id="api-key-input" placeholder="Get yours at console.anthropic.com">
+          <button class="key-toggle" id="key-toggle-btn" title="Show/hide"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <label>Fetch & Score Settings</label>
+        <div class="setting-row">
+          <span class="setting-label">Fetch days back</span>
+          <input type="number" id="days-back" value="2" min="1" max="30">
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">⚡ Haiku drop if ≤</span>
+          <input type="number" id="haiku-threshold" value="3" min="1" max="9">
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Abstract chars (scoring)</span>
+          <select id="abstract-chars" style="width:66px;flex-shrink:0;height:28px;padding:3px 4px;font-size:11px;border-radius:5px">
+            <option value="300">300</option>
+            <option value="500" selected>500</option>
+            <option value="800">800</option>
+            <option value="1000">1000</option>
+            <option value="1500">1500</option>
+            <option value="0">∞</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="profile-group">
+      <button class="group-toggle" id="profile-toggle">
+        Profile <span class="toggle-icon">▾</span>
+      </button>
+      <div class="group-content" id="profile-content">
+
+        <div class="sidebar-section">
+          <label>Research Context<span style="display:block;font-weight:normal;color:var(--text3);text-transform:none;letter-spacing:normal;margin-top:2px">who you are · <span id="context-count">0</span>/160 chars</span></label>
+          <textarea id="context-input" maxlength="160" placeholder="e.g. I am a climate scientist focused on the intersection of ML and atmospheric science."></textarea>
+        </div>
+
+        <div class="sidebar-section">
+          <label>Prioritize <span style="font-weight:normal;color:var(--text3)">(score 8–10)</span></label>
+          <textarea id="prioritize-input" placeholder="- AI emulators for climate&#10;- XAI in geoscience&#10;- decadal predictability"></textarea>
+        </div>
+
+        <div class="sidebar-section">
+          <label>Transferable Methods <span style="font-weight:normal;color:var(--text3)">(score 8–10)</span><span style="display:block;font-weight:normal;color:var(--text3);text-transform:none;letter-spacing:normal;margin-top:2px">not yet in your field · spatial/temporal methods</span></label>
+          <textarea id="methods-input" placeholder="- uncertainty quantification&#10;- OOD detection&#10;- probabilistic forecasting"></textarea>
+        </div>
+
+        <div class="sidebar-section">
+          <label>Downgrade <span style="font-weight:normal;color:var(--text3)">(score 1–4)</span></label>
+          <textarea id="downgrade-input" placeholder="- purely observational studies&#10;- standard NWP without novel AI"></textarea>
+        </div>
+
+        <div class="sidebar-section">
+          <label>Priority Authors <span style="font-weight:normal;color:var(--text3)">(score 8–10)</span></label>
+          <textarea id="authors-input" placeholder="One name per line. Papers by these authors always score 8-10." style="height:130px;line-height:1.6"></textarea>
+        </div>
+
+      </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <label style="margin-bottom:0">Journals <span id="journal-count" style="font-weight:normal;color:var(--text3);text-transform:none;letter-spacing:normal"></span></label>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost" id="journals-all-btn" style="font-size:9px;padding:2px 8px;">All</button>
+            <button class="btn btn-ghost" id="journals-none-btn" style="font-size:9px;padding:2px 8px;">None</button>
+          </div>
+        </div>
+        <div id="journal-list"></div>
+      </div>
+
+      <div class="sidebar-section" style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost" id="theme-toggle-btn" style="font-size:10px;padding:3px 8px">☀ Light</button>
+        <button class="btn btn-ghost" id="clear-cache-btn" style="font-size:10px;padding:3px 8px">Clear cache</button>
+        <button class="btn btn-ghost" id="docs-btn" style="font-size:10px;padding:3px 8px">Docs</button>
+      </div>
+
+    </aside>
+
+    <!-- Main feed -->
+    <section id="feed-area">
+      <div id="filter-bar">
+        <span>Filter:</span>
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="new">New only</button>
+        <select id="min-score" title="Minimum score to show">
+          <option value="1">Score ≥ 1</option>
+          <option value="2">Score ≥ 2</option>
+          <option value="3">Score ≥ 3</option>
+          <option value="4">Score ≥ 4</option>
+          <option value="5">Score ≥ 5</option>
+          <option value="6" selected>Score ≥ 6</option>
+          <option value="7">Score ≥ 7</option>
+          <option value="8">Score ≥ 8</option>
+          <option value="9">Score ≥ 9</option>
+          <option value="10">Score = 10</option>
+        </select>
+        <input type="text" id="search-box" placeholder="Search titles, authors...">
+        <button class="btn btn-ghost" id="export-btn" style="margin-left:auto">↓ Export</button>
+        <button class="btn btn-ghost" id="brief-btn">✦ Brief</button>
+      </div>
+
+      <div id="stats-bar" style="display:none">
+        <div class="stat"><span class="stat-val" id="stat-total">0</span><span class="stat-label">Fetched</span></div>
+        <div class="stat"><span class="stat-val" id="stat-shown">0</span><span class="stat-label">Shown</span></div>
+        <div class="stat"><span class="stat-val" id="stat-new">0</span><span class="stat-label">New</span></div>
+        <div class="stat"><span class="stat-val" id="stat-hi">0</span><span class="stat-label">Score≥8</span></div>
+      </div>
+
+      <div id="progress-area"></div>
+      <div id="error-area"></div>
+      <div id="papers-container"></div>
+      <div id="empty-state">
+        <div class="big">No papers yet</div>
+        <p>Configure your profile and API key in the sidebar, select journals, then hit <strong>Fetch &amp; Score</strong> to pull the latest papers and rank them by relevance.</p>
+      </div>
+    </section>
+  </main>
+  <footer id="app-footer"></footer>
+
+</div>
+
+<script>
+// ── VERSION ───────────────────────────────────────────────────────────────────
+// Update this single constant when bumping the version number.
+const VERSION = 'v2.75';
+
+// ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
+// type: "openalex" → direct API call, no proxy needed (preferred)
+// type: "rss"      → fetched via CORS proxy (arXiv only; category-exact, no OA equivalent)
+const JOURNALS = [
+  {
+    id: "aies",
+    name: "AI for Earth Systems (AMS)",
+    type: "openalex",
+    openalexIssn: "2769-7525"
+  },
+  {
+    id: "arxiv-cs-lg",
+    name: "arXiv cs.LG",
+    rss: "https://rss.arxiv.org/rss/cs.LG",
+    type: "rss"
+  },
+  {
+    id: "arxiv-ao-ph",
+    name: "arXiv physics.ao-ph",
+    rss: "https://rss.arxiv.org/rss/physics.ao-ph",
+    type: "rss"                          // arXiv RSS is category-exact; no OA equivalent
+  },
+  {
+    id: "arxiv-stat-ml",
+    name: "arXiv stat.ML",
+    rss: "https://rss.arxiv.org/rss/stat.ML",
+    type: "rss"
+  },
+  {
+    id: "bams",
+    name: "BAMS (AMS)",
+    type: "openalex",
+    openalexIssn: "1520-0477"
+  },
+  {
+    id: "earthsfuture",
+    name: "Earth's Future (AGU)",
+    type: "openalex",
+    openalexIssn: "2328-4277"
+  },
+  {
+    id: "eartharxiv",
+    name: "EarthArXiv",
+    type: "openalex",
+    openalexSourceId: "S4306401273"
+  },
+  {
+    id: "eds",
+    name: "Environmental Data Science",
+    type: "openalex",
+    openalexIssn: "2634-4602"
+  },
+  {
+    id: "er-climate",
+    name: "Environmental Research: Climate",
+    type: "openalex",
+    openalexIssn: "2752-5295"
+  },
+  {
+    id: "erl",
+    name: "Environmental Research Letters",
+    type: "openalex",
+    openalexIssn: "1748-9326"
+  },
+  {
+    id: "gmd",
+    name: "Geoscientific Model Development",
+    type: "openalex",
+    openalexIssn: "1991-959X"
+  },
+  {
+    id: "grl",
+    name: "GRL (AGU)",
+    type: "openalex",
+    openalexIssn: "1944-8007"
+  },
+  {
+    id: "james",
+    name: "JAMES (AGU)",
+    type: "openalex",
+    openalexIssn: "1942-2466"
+  },
+  {
+    id: "jgr-atmos",
+    name: "JGR-Atmospheres (AGU)",
+    type: "openalex",
+    openalexIssn: "2169-8996"
+  },
+  {
+    id: "jgr-ml",
+    name: "JGR: Machine Learning and Computation (AGU)",
+    type: "openalex",
+    openalexIssn: "2993-5210"
+  },
+  {
+    id: "ml-earth",
+    name: "Machine Learning: Earth",
+    type: "openalex",
+    openalexIssn: "3049-4753"
+  },
+  {
+    id: "mwr",
+    name: "Monthly Weather Review (AMS)",
+    type: "openalex",
+    openalexIssn: "1520-0493"
+  },
+  {
+    id: "nature",
+    name: "Nature",
+    type: "openalex",
+    openalexIssn: "1476-4687"
+  },
+  {
+    id: "nature-cc",
+    name: "Nature Climate Change",
+    type: "openalex",
+    openalexIssn: "1758-6798"
+  },
+  {
+    id: "nature-comms",
+    name: "Nature Communications",
+    type: "openalex",
+    openalexIssn: "2041-1723"
+  },
+  {
+    id: "npj-climate",
+    name: "npj Climate and Atmospheric Science",
+    type: "openalex",
+    openalexIssn: "2397-3722"
+  },
+  {
+    id: "pnas",
+    name: "PNAS",
+    type: "openalex",
+    openalexIssn: "0027-8424"
+  },
+  {
+    id: "science",
+    name: "Science (AAAS)",
+    type: "openalex",
+    openalexIssn: "0036-8075"
+  },
+  {
+    id: "science-advances",
+    name: "Science Advances (AAAS)",
+    type: "openalex",
+    openalexIssn: "2375-2548"
+  },
+  {
+    id: "scientific-reports",
+    name: "Scientific Reports (Nature)",
+    type: "openalex",
+    openalexIssn: "2045-2322"
+  }
+];
+
+// ── CORS PROXIES (only used for arXiv RSS) ───────────────────────────────────
+const CORS_PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+];
+
+// ── MODEL ─────────────────────────────────────────────────────────────────────
+// Update these lines when you need to switch models. Pinned intentionally
+// to keep costs predictable — newer models may be significantly more expensive.
+const MODEL              = 'claude-sonnet-4-5';
+const MODEL_HAIKU        = 'claude-haiku-4-5-20251001';
+// HAIKU_THRESHOLD is read dynamically from #haiku-threshold in settings
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let papers = [];           // scored papers from current run
+let dismissed = new Set(); // dismissed DOIs/ids
+let seenIds = new Set();   // all ever-seen ids (persisted)
+let newIdsThisRun = new Set(); // IDs first seen in the most recent fetch
+let currentFilter  = 'all';
+let searchQuery    = '';
+let haikusPrefilter = true;   // when true, Haiku filters before Sonnet scores
+let scoreCache = {};           // persists Sonnet scores across runs; keyed by paper id
+let abortRequested = false;    // set to true by the Stop button to halt mid-run
+
+// ── PERSISTENCE ───────────────────────────────────────────────────────────────
+function loadState() {
+  try {
+    const s = localStorage.getItem('litmonitor_seen');
+    if (s) seenIds = new Set(JSON.parse(s));
+    const d = localStorage.getItem('litmonitor_dismissed');
+    if (d) dismissed = new Set(JSON.parse(d));
+    const context = localStorage.getItem('litmonitor_context');
+    if (context) document.getElementById('context-input').value = context;
+    const key = localStorage.getItem('litmonitor_key');
+    if (key) document.getElementById('api-key-input').value = key;
+    const prioritize = localStorage.getItem('litmonitor_prioritize');
+    if (prioritize) document.getElementById('prioritize-input').value = prioritize;
+    const methods = localStorage.getItem('litmonitor_methods');
+    if (methods) document.getElementById('methods-input').value = methods;
+    const downgrade = localStorage.getItem('litmonitor_downgrade');
+    if (downgrade) document.getElementById('downgrade-input').value = downgrade;
+    const authors = localStorage.getItem('litmonitor_authors');
+    if (authors) document.getElementById('authors-input').value = authors;
+    const days = localStorage.getItem('litmonitor_days');
+    if (days) document.getElementById('days-back').value = days;
+    // Profile always starts open each session — no persistence for collapsed state
+    const score = localStorage.getItem('litmonitor_minscore');
+    if (score) document.getElementById('min-score').value = score;
+    const haikuThresh = localStorage.getItem('litmonitor_haikuthreshold');
+    if (haikuThresh) document.getElementById('haiku-threshold').value = haikuThresh;
+    const abstractChars = localStorage.getItem('litmonitor_abstractchars');
+    if (abstractChars) document.getElementById('abstract-chars').value = abstractChars;
+    const lastFetch = localStorage.getItem('litmonitor_last_fetch');
+    const lastCount = localStorage.getItem('litmonitor_last_count');
+    if (lastFetch) {
+      const dt = new Date(lastFetch);
+      const diffMs = Date.now() - dt.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      let ago;
+      if (diffMins < 1) ago = 'just now';
+      else if (diffMins < 60) ago = `${diffMins}m ago`;
+      else if (diffHours < 24) ago = `${diffHours}h ago`;
+      else ago = `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      const countStr = lastCount ? ` · ${lastCount} papers scored` : '';
+      document.getElementById('status-line').textContent = `last run: ${ago}${countStr}`;
+    }
+    const journals = localStorage.getItem('litmonitor_journals');
+    const selected = journals ? new Set(JSON.parse(journals)) : new Set(JOURNALS.map(j => j.id));
+    JOURNALS.forEach(j => {
+      const cb = document.querySelector(`[data-journal-id="${j.id}"]`);
+      if (cb) {
+        cb.checked = selected.has(j.id);
+        cb.closest('.journal-item').classList.toggle('checked', cb.checked);
+      }
+    });
+  } catch(e) {}
+}
+
+function saveSettings() {
+  localStorage.setItem('litmonitor_context', document.getElementById('context-input').value);
+  localStorage.setItem('litmonitor_key', document.getElementById('api-key-input').value);
+  localStorage.setItem('litmonitor_prioritize', document.getElementById('prioritize-input').value);
+  localStorage.setItem('litmonitor_methods', document.getElementById('methods-input').value);
+  localStorage.setItem('litmonitor_downgrade', document.getElementById('downgrade-input').value);
+  localStorage.setItem('litmonitor_authors', document.getElementById('authors-input').value);
+  localStorage.setItem('litmonitor_days', document.getElementById('days-back').value);
+  localStorage.setItem('litmonitor_minscore', document.getElementById('min-score').value);
+  localStorage.setItem('litmonitor_haikuthreshold', document.getElementById('haiku-threshold').value);
+  localStorage.setItem('litmonitor_abstractchars', document.getElementById('abstract-chars').value);
+  const selected = Array.from(document.querySelectorAll('[data-journal-id]:checked')).map(cb => cb.dataset.journalId);
+  localStorage.setItem('litmonitor_journals', JSON.stringify(selected));
+}
+
+
+function saveSeenIds() {
+  localStorage.setItem('litmonitor_seen', JSON.stringify([...seenIds]));
+}
+
+function saveDismissed() {
+  localStorage.setItem('litmonitor_dismissed', JSON.stringify([...dismissed]));
+}
+
+// ── SCORE CACHE ───────────────────────────────────────────────────────────────
+// Persists Sonnet scores across runs so already-scored papers are never re-sent
+// to Claude. Only Sonnet scores are cached — Haiku prefilter scores are ephemeral.
+function loadScoreCache() {
+  try {
+    const c = localStorage.getItem('litmonitor_score_cache');
+    if (c) scoreCache = JSON.parse(c);
+  } catch(e) {}
+}
+
+function saveScoreCache() {
+  try {
+    localStorage.setItem('litmonitor_score_cache', JSON.stringify(scoreCache));
+  } catch(e) {}
+}
+
+// ── BUILD JOURNAL LIST ────────────────────────────────────────────────────────
+function updateJournalCount() {
+  const total = JOURNALS.length;
+  const selected = document.querySelectorAll('[data-journal-id]:checked').length;
+  document.getElementById('journal-count').textContent = `${selected}/${total}`;
+}
+
+function buildJournalList() {
+  const container = document.getElementById('journal-list');
+  container.innerHTML = '';
+  JOURNALS.forEach(j => {
+    const isDirect = j.type === 'openalex';
+    const item = document.createElement('label');
+    item.className = 'journal-item checked';
+    item.innerHTML = `
+      <input type="checkbox" data-journal-id="${j.id}" checked>
+      <span class="journal-name">${j.name}</span>
+      <span class="journal-source ${isDirect ? 'direct' : ''}" title="${isDirect ? 'Direct API (reliable)' : 'RSS via proxy'}">${isDirect ? 'api' : 'rss'}</span>
+    `;
+    const cb = item.querySelector('input');
+    cb.addEventListener('change', () => {
+      item.classList.toggle('checked', cb.checked);
+      saveSettings();
+      updateJournalCount();
+    });
+    container.appendChild(item);
+  });
+  updateJournalCount();
+}
+
+// ── FETCH VIA PROXY (arXiv only) ─────────────────────────────────────────────
+async function fetchWithProxy(url) {
+  for (const makeProxy of CORS_PROXIES) {
+    try {
+      const resp = await fetch(makeProxy(url), { signal: AbortSignal.timeout(12000) });
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text && text.length > 100) return text;
+      }
+    } catch(e) {}
+  }
+  throw new Error(`All proxies failed for ${url}`);
+}
+
+// ── FETCH FROM OPENALEX (no proxy needed, fully open API) ────────────────────
+// identifier: ISSN string (e.g. "1748-9326") OR OpenAlex source ID (e.g. "S4306401273")
+// To find a source ID: https://api.openalex.org/sources?filter=display_name.search:JOURNAL+NAME
+async function fetchOpenAlex(identifier, journalName, cutoff) {
+  const fromDate = cutoff.toISOString().split('T')[0];
+  // Detect whether identifier is an OpenAlex source ID (starts with S + digits) or an ISSN
+  const filterKey = /^S\d+$/.test(identifier)
+    ? `primary_location.source.id:https://openalex.org/${identifier}`
+    : `primary_location.source.issn:${identifier}`;
+  const url = `https://api.openalex.org/works?filter=${filterKey},from_publication_date:${fromDate}&per-page=50&sort=publication_date:desc&select=id,title,authorships,abstract_inverted_index,primary_location,publication_date,doi&mailto=litmonitor@user`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!resp.ok) throw new Error(`OpenAlex API error ${resp.status}`);
+  const data = await resp.json();
+  const results = [];
+  (data.results || []).forEach(work => {
+    const title = work.title || '';
+    if (!title) return;
+    const date = new Date(work.publication_date || '');
+    if (cutoff && !isNaN(date) && date < cutoff) return;
+    const authors = (work.authorships || [])
+      .slice(0, 5)
+      .map(a => a.author?.display_name || '')
+      .filter(Boolean)
+      .join(', ');
+    let abstract = '';
+    if (work.abstract_inverted_index) {
+      const words = {};
+      Object.entries(work.abstract_inverted_index).forEach(([word, positions]) => {
+        positions.forEach(pos => { words[pos] = word; });
+      });
+      abstract = Object.keys(words).sort((a,b) => Number(a)-Number(b)).map(k => words[k]).join(' ');
+    }
+    const doi = work.doi || '';
+    const link = doi ? `https://doi.org/${doi.replace('https://doi.org/','')}` : (work.primary_location?.landing_page_url || '');
+    const id = doi || `${title}-${work.publication_date}`;
+    results.push({ id, title, authors, abstract, link, date, journal: journalName });
+  });
+  return results;
+}
+
+// ── PARSE RSS ─────────────────────────────────────────────────────────────────
+function parseRSS(xml, journalName, cutoff) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const items = [...doc.querySelectorAll('item, entry')];
+  const results = [];
+
+  items.forEach(item => {
+    // Title
+    const titleEl = item.querySelector('title');
+    const title = titleEl ? titleEl.textContent.trim().replace(/<!\[CDATA\[|\]\]>/g, '') : '';
+    if (!title || title.length < 5) return;
+
+    // Date
+    let dateStr = '';
+    const dateEl = item.querySelector('pubDate, published, updated, dc\\:date, date');
+    if (dateEl) dateStr = dateEl.textContent.trim();
+    const date = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(date)) {
+      // try to parse arxiv-style id date
+    }
+    if (cutoff && date < cutoff) return;
+
+    // Link / DOI
+    let link = '';
+    const linkEl = item.querySelector('link');
+    if (linkEl) link = linkEl.textContent.trim() || linkEl.getAttribute('href') || '';
+    if (!link) {
+      const guidEl = item.querySelector('guid');
+      if (guidEl) link = guidEl.textContent.trim();
+    }
+
+    // Abstract / description
+    let abstract = '';
+    const descEl = item.querySelector('description, summary, content');
+    if (descEl) {
+      abstract = descEl.textContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      // strip "Abstract:" prefix
+      abstract = abstract.replace(/^Abstract[:\s]*/i, '');
+    }
+
+    // Authors
+    let authors = '';
+    const authorEls = item.querySelectorAll('author, dc\\:creator, creator');
+    if (authorEls.length) {
+      authors = [...authorEls].map(a => {
+        const name = a.querySelector('name');
+        return (name ? name.textContent : a.textContent).trim();
+      }).join(', ');
+    }
+
+    // Unique id
+    const id = link || `${title}-${date.toISOString()}`;
+
+    results.push({ id, title, authors, abstract, link, date, journal: journalName });
+  });
+
+  return results;
+}
+
+// ── ABSTRACT ENRICHMENT VIA SEMANTIC SCHOLAR ─────────────────────────────────
+// OpenAlex withholds abstracts for papers from publishers that assert copyright
+// over them (Nature Group, AAAS, AMS, etc.). Semantic Scholar has separate
+// agreements with many of these publishers and can fill the gaps.
+//
+// This function fires a single batch POST against the Semantic Scholar Graph API
+// for all no-abstract papers that have a resolvable DOI, then mutates the paper
+// objects in-place. Entirely best-effort: any error is silently swallowed so a
+// Semantic Scholar outage never blocks the main scoring workflow.
+//
+// Semantic Scholar batch endpoint: POST /graph/v1/paper/batch?fields=abstract
+// Accepts up to 500 IDs per call; we chunk if needed.
+const DOI_URL_RE = /^https?:\/\/doi\.org\/(10\..+)/i;
+
+async function enrichAbstracts(papers) {
+  // Select only papers that (a) lack an abstract and (b) have a DOI URL as link
+  const toEnrich = papers.filter(
+    p => (!p.abstract || !p.abstract.trim()) && p.link && DOI_URL_RE.test(p.link)
+  );
+  if (!toEnrich.length) return;
+
+  // Semantic Scholar accepts IDs as "DOI:10.xxxx/yyyy"
+  const ids = toEnrich.map(p => `DOI:${p.link.match(DOI_URL_RE)[1]}`);
+
+  // Chunk into groups of 500 (API maximum per request)
+  const CHUNK = 500;
+  for (let start = 0; start < ids.length; start += CHUNK) {
+    const chunkIds     = ids.slice(start, start + CHUNK);
+    const chunkPapers  = toEnrich.slice(start, start + CHUNK);
+    try {
+      const resp = await fetch(
+        'https://api.semanticscholar.org/graph/v1/paper/batch?fields=abstract',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: chunkIds }),
+          signal: AbortSignal.timeout(15000)
+        }
+      );
+      if (!resp.ok) continue;
+      const results = await resp.json();
+      // results is an array aligned with chunkIds; entries may be null
+      results.forEach((result, i) => {
+        if (result && result.abstract && result.abstract.trim()) {
+          chunkPapers[i].abstract = result.abstract.trim();
+        }
+      });
+    } catch(e) {
+      // Silently skip this chunk — enrichment is never blocking
+    }
+  }
+}
+
+// ── SCORE WITH CLAUDE ─────────────────────────────────────────────────────────
+// abstractChars: max characters of abstract to send (0 = no limit).
+// Scoring can work fine with a partial abstract or none at all;
+// brief generation always uses full abstracts (it doesn't call this function).
+async function scorePapers(papersToScore, profile, priorityAuthors, apiKey, onProgress, model = MODEL, abstractChars = 0) {
+  const BATCH = 20;
+  const scored = [];
+
+  for (let i = 0; i < papersToScore.length; i += BATCH) {
+    // Check for user-requested abort before each batch
+    if (abortRequested) break;
+
+    const batch = papersToScore.slice(i, i + BATCH);
+    onProgress(i, papersToScore.length, `Scoring ${i+1}–${Math.min(i+BATCH, papersToScore.length)} of ${papersToScore.length}...`);
+
+    const paperList = batch.map((p, idx) => {
+      let abstract = p.abstract || '(no abstract)';
+      if (abstractChars > 0 && p.abstract && p.abstract.length > abstractChars) {
+        abstract = p.abstract.slice(0, abstractChars) + '…';
+      }
+      return `[${idx+1}] TITLE: ${p.title}\nAUTHORS: ${p.authors || 'unknown'}\nJOURNAL: ${p.journal}\nABSTRACT: ${abstract}`;
+    }).join('\n\n---\n\n');
+
+    const prompt = `You are a relevance filter for a research scientist. Score each paper 1-10 for relevance to this researcher's profile.
+
+RESEARCHER PROFILE:
+${profile}
+
+SCORING GUIDE:
+Use the researcher's profile sections to determine scores. The profile may contain PRIORITIZE, METHODS, and DOWNGRADE sections.
+
+- 8-10: Directly on-topic. Two pathways to this score:
+  (a) PRIORITIZE match: the paper's topic, application area, or contribution directly matches something in the researcher's PRIORITIZE list. Use semantic judgment — exact keyword overlap is not required.
+  (b) TRANSFERABLE METHODS match: the paper advances or applies a technique listed in the researcher's METHODS section, AND the method operates on spatial, temporal, or spatiotemporal data in a way that would transfer naturally to the researcher's domain as described in their Research Context — even if it has not yet been applied there.${priorityAuthors ? `\n  (c) Priority authors: if ANY author or co-author matches a name in the priority list below, score 8-10 regardless of topic. Use fuzzy matching on last name + first initial if full names differ slightly.\n  PRIORITY AUTHORS:\n${priorityAuthors.split('\n').filter(a => a.trim()).map(a => `  - ${a.trim()}`).join('\n')}` : ''}
+- 5-7: Peripherally relevant — related to the PRIORITIZE or TRANSFERABLE METHODS topics but not a strong match; might inform the researcher's work without being directly on-topic.
+- 1-4: Not relevant — matches topics in the DOWNGRADE list, or has no meaningful connection to any section of the researcher's profile.
+- 3-5: Default for papers that don't clearly fit any profile section — score conservatively unless you can identify a genuine connection.
+
+When in doubt, score lower rather than higher. Papers should earn high scores, not receive them by default.
+
+PAPERS TO SCORE:
+${paperList}
+
+Respond ONLY with a JSON array of objects, one per paper, in order. Each object must have exactly these fields:
+- "score": integer 1-10
+- "reason": one concise sentence (max 20 words) explaining why
+
+Example: [{"score": 8, "reason": "Novel XAI approach for climate attribution aligns directly with interpretability work."}, ...]
+
+Respond with ONLY the JSON array, no other text.`;
+
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({
+          model: model,
+          max_tokens: 1200,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `API error ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      const text = data.content.find(c => c.type === 'text')?.text || '[]';
+      const clean = text.replace(/```json|```/g, '').trim();
+      const scores = JSON.parse(clean);
+
+      batch.forEach((p, idx) => {
+        const s = scores[idx] || { score: 5, reason: 'No score returned.' };
+        scored.push({ ...p, score: Number(s.score) || 5, reason: s.reason || '' });
+      });
+    } catch(e) {
+      // On failure, add with score 0 and error
+      batch.forEach(p => scored.push({ ...p, score: 0, reason: `Scoring error: ${e.message}` }));
+    }
+
+    // Small delay to avoid rate limits
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  return scored;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function scoreClass(s) {
+  if (s >= 8) return 'score-hi';
+  if (s >= 6) return 'score-mid';
+  return 'score-lo';
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt)) return '';
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getVisiblePapers() {
+  const minScore = parseInt(document.getElementById('min-score').value) || 6;
+  let visible = papers.filter(p => {
+    if (Number(p.score) < minScore) return false;
+    if (dismissed.has(p.id)) return false;
+    if (currentFilter === 'new' && !newIdsThisRun.has(p.id)) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return p.title.toLowerCase().includes(q) || (p.authors || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+  visible.sort((a, b) => b.score - a.score);
+  return visible;
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function exportVisible() {
+  const visible = getVisiblePapers();
+  if (!visible.length) { alert('Nothing to export — no papers are currently shown.'); return; }
+
+  const dateStr   = new Date().toISOString().split('T')[0];
+  const timestamp = new Date().toLocaleString();
+
+  // Mirror the app's current theme
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const themeVars = isLight
+    ? `--bg:#f8faf8;--surface:#ffffff;--border:#ccd6ce;--text:#1a201c;--text2:#3d5443;--text3:#7a8e80;--accent:#16a34a;`
+    : `--bg:#0d0f0e;--surface:#141816;--border:#2a2f2c;--text:#e8ede9;--text2:#8fa494;--text3:#5a6b5e;--accent:#4ade80;`;
+  const hiCol  = isLight ? '#16a34a' : '#4ade80';
+  const midCol = isLight ? '#d97706' : '#fbbf24';
+  const loCol  = isLight ? '#dc2626' : '#f87171';
+
+  const cards = visible.map(p => {
+    const date = p.date ? (p.date instanceof Date ? p.date : new Date(p.date)) : null;
+    const mo   = date && !isNaN(date)
+      ? date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
+    const auth = p.authors
+      ? p.authors.split(',').slice(0, 3).join(', ') + (p.authors.split(',').length > 3 ? ' et al.' : '')
+      : '';
+    const scoreCol  = p.score >= 8 ? hiCol : p.score >= 6 ? midCol : loCol;
+    const titleHtml = p.link
+      ? `<a href="${p.link}" target="_blank" rel="noopener">${escHtml(p.title)}</a>`
+      : escHtml(p.title);
+    return `<div class="card">
+  <div class="card-header">
+    <span class="score-badge" style="color:${scoreCol};border-color:${scoreCol}">${p.score}</span>
+    <div class="card-title">${titleHtml}</div>
+  </div>
+  <div class="card-meta">${escHtml(p.journal)}${mo ? ' &middot; ' + escHtml(mo) : ''}${auth ? ' &middot; ' + escHtml(auth) : ''}</div>
+  ${p.reason   ? `<div class="card-reason">${escHtml(p.reason)}</div>` : ''}
+  <details><summary>Abstract</summary><p class="abstract">${p.abstract ? escHtml(p.abstract) : '<em>No abstract available.</em>'}</p></details>
+</div>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LitMonitor Earth — ${dateStr}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root{${themeVars}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;font-size:15px;line-height:1.65;color:var(--text);background:var(--bg);margin:0;padding:2.5rem 1.5rem 5rem}
+  .wrap{max-width:720px;margin:0 auto}
+  .masthead{margin-bottom:1.8rem;border-bottom:2px solid var(--text);padding-bottom:0.8rem}
+  .wordmark{font-family:'Fraunces',serif;font-size:22px;font-weight:300;font-style:italic;letter-spacing:-0.02em;color:var(--text);margin-bottom:0.2rem}
+  .wm-monitor{color:var(--accent);font-style:normal;font-weight:300}
+  .wm-earth{color:var(--text2);font-style:normal;font-weight:300}
+  .wm-sub{font-family:system-ui,sans-serif;font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text2);font-style:normal;vertical-align:middle;margin-left:0.4rem}
+  .dateline{font-size:0.78rem;color:var(--text2)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.1rem 1.3rem;margin-bottom:1rem}
+  .card-header{display:flex;gap:0.75rem;align-items:flex-start;margin-bottom:0.3rem}
+  .score-badge{flex-shrink:0;font-weight:700;font-size:0.8rem;border:1.5px solid;border-radius:4px;padding:1px 6px;line-height:1.6;margin-top:1px}
+  .card-title{font-size:0.95rem;font-weight:600;line-height:1.4;color:var(--text)}
+  .card-title a{color:var(--accent);text-decoration:none}
+  .card-title a:hover{text-decoration:underline}
+  .card-meta{font-size:0.75rem;color:var(--text2);margin-bottom:0.5rem;padding-left:2.2rem}
+  .card-reason{font-size:0.85rem;color:var(--text);font-style:italic;padding-left:2.2rem;margin-bottom:0.4rem}
+  details{padding-left:2.2rem;margin-top:0.3rem}
+  summary{cursor:pointer;font-size:0.78rem;color:var(--text2)}
+  .abstract{font-size:0.83rem;line-height:1.6;color:var(--text2);margin:0.4rem 0 0}
+  .dl-btn{position:fixed;top:1rem;right:1rem;background:var(--accent);color:${isLight ? '#fff' : '#0d0f0e'};border:none;border-radius:6px;padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+</style>
+</head>
+<body>
+<button class="dl-btn" onclick="dlPage('litmonitor-export-${dateStr}.html')">↓ Download</button>
+<div class="wrap">
+  <div class="masthead">
+    <div class="wordmark">Lit<span class="wm-monitor">Monitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Export</span></div>
+    <div class="dateline">${timestamp} &middot; ${visible.length} papers &middot; min score ${document.getElementById('min-score').value}${currentFilter !== 'all' ? ' &middot; filter: ' + currentFilter : ''}${searchQuery ? ' &middot; search: &ldquo;' + escHtml(searchQuery) + '&rdquo;' : ''}</div>
+  </div>
+  ${cards}
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+</div>
+<script>
+function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
+<\/script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderPapers() {
+  const container = document.getElementById('papers-container');
+  const empty = document.getElementById('empty-state');
+  const statsBar = document.getElementById('stats-bar');
+
+  let visible = getVisiblePapers();
+
+  // Stats
+  const newCount = papers.filter(p => !seenIds.has(p.id) && p.score >= minScore).length;
+  const hiCount = papers.filter(p => p.score >= 8).length;
+  document.getElementById('stat-total').textContent = papers.length;
+  document.getElementById('stat-shown').textContent = visible.length;
+  document.getElementById('stat-new').textContent = newCount;
+  document.getElementById('stat-hi').textContent = hiCount;
+
+  if (visible.length === 0) {
+    container.innerHTML = '';
+    empty.style.display = 'block';
+    statsBar.style.display = papers.length ? 'flex' : 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  statsBar.style.display = 'flex';
+
+  container.innerHTML = '';
+  visible.forEach((p, i) => {
+    const isNew = newIdsThisRun.has(p.id);
+    const card = document.createElement('div');
+    card.className = 'paper-card';
+    card.style.animationDelay = `${i * 0.04}s`;
+    card.dataset.id = p.id;
+
+    const linkHtml = p.link
+      ? `<a href="${p.link}" target="_blank" rel="noopener">${p.title}</a>`
+      : p.title;
+
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="score-badge ${scoreClass(p.score)}">${p.score}</div>
+        <div class="card-meta">
+          <div class="paper-title">${linkHtml}</div>
+          <div class="paper-authors">${p.authors || 'Authors not available'}</div>
+          <div class="paper-tags">
+            <span class="tag tag-journal">${p.journal}</span>
+            <span class="tag tag-date">${formatDate(p.date)}</span>
+            ${isNew ? '<span class="tag tag-new">new</span>' : ''}
+          </div>
+        </div>
+      </div>
+      ${p.reason ? `<div class="card-reason">${p.reason}</div>` : ''}
+      <div class="card-abstract">${p.abstract || ''}</div>
+      <div class="card-actions">
+        ${p.link ? `<a href="${p.link}" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none;font-size:10px;padding:4px 10px;">Open →</a>` : ''}
+        <button class="btn btn-ghost abstract-btn">Abstract</button>
+        <button class="btn btn-ghost dismiss-btn" data-id="${p.id}">Dismiss</button>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+
+  // Abstract toggle handlers
+  container.querySelectorAll('.abstract-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const abstractEl = btn.closest('.paper-card').querySelector('.card-abstract');
+      if (!abstractEl.textContent.trim()) {
+        abstractEl.innerHTML = '<em style="color:var(--text3)">No abstract available.</em>';
+      }
+      const open = abstractEl.classList.toggle('open');
+      btn.textContent = open ? 'Hide abstract' : 'Abstract';
+    });
+  });
+
+  // Dismiss handlers
+  container.querySelectorAll('.dismiss-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      dismissed.add(id);
+      saveDismissed();
+      const card = container.querySelector(`[data-id="${id}"]`);
+      if (card) {
+        card.classList.add('dismissed');
+        setTimeout(() => { card.remove(); renderPapers(); }, 400);
+      }
+    });
+  });
+}
+
+// ── PROGRESS / ERROR UI ────────────────────────────────────────────────────────
+function showProgress(current, total, msg) {
+  const area = document.getElementById('progress-area');
+  const pct = total ? Math.round((current / total) * 100) : 0;
+  area.innerHTML = `
+    <div class="progress-row">
+      <span class="spinner"></span>
+      <span>${msg}</span>
+      <div class="progress-fill"><div class="progress-fill-inner" style="width:${pct}%"></div></div>
+      <span style="color:var(--text3)">${pct}%</span>
+    </div>`;
+}
+
+function clearProgress() {
+  document.getElementById('progress-area').innerHTML = '';
+}
+
+function showError(msg) {
+  document.getElementById('error-area').innerHTML = `<div class="error-msg">⚠ ${msg}</div>`;
+}
+
+function clearErrors() {
+  document.getElementById('error-area').innerHTML = '';
+}
+
+// ── MAIN FETCH & SCORE ────────────────────────────────────────────────────────
+async function fetchAndScore() {
+  const apiKey = document.getElementById('api-key-input').value.trim();
+  const context = document.getElementById('context-input').value.trim();
+  const prioritize = document.getElementById('prioritize-input').value.trim();
+  const methods = document.getElementById('methods-input').value.trim();
+  const downgrade = document.getElementById('downgrade-input').value.trim();
+  const daysBack = parseInt(document.getElementById('days-back').value) || 2;
+  const minScore = parseInt(document.getElementById('min-score').value) || 6;
+
+  // Assemble profile string from the separate fields
+  const profileParts = [];
+  if (context)    profileParts.push(context);
+  if (prioritize) profileParts.push(`PRIORITIZE:\n${prioritize}`);
+  if (methods)    profileParts.push(`METHODS:\n${methods}`);
+  if (downgrade)  profileParts.push(`DOWNGRADE:\n${downgrade}`);
+  const profile = profileParts.join('\n\n');
+
+  if (!apiKey) { showError('Please enter your Anthropic API key in the sidebar.'); return; }
+  if (!profile) { showError('Please fill in at least one profile section (Prioritize or Methods) in the sidebar.'); return; }
+
+  const selectedJournals = JOURNALS.filter(j => {
+    const cb = document.querySelector(`[data-journal-id="${j.id}"]`);
+    return cb && cb.checked;
+  });
+  if (!selectedJournals.length) { showError('Please select at least one journal.'); return; }
+
+  saveSettings();
+  clearErrors();
+
+  // Reset abort flag and show Stop button
+  abortRequested = false;
+  const fetchBtn = document.getElementById('fetch-btn');
+  const stopBtn  = document.getElementById('stop-btn');
+  fetchBtn.disabled = true;
+  stopBtn.style.display = '';
+  document.getElementById('status-line').textContent = 'fetching...';
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysBack);
+
+  // Step 1: Fetch all journals
+  let allPapers = [];
+  let fetchErrors = [];
+
+  for (let i = 0; i < selectedJournals.length; i++) {
+    if (abortRequested) break;
+    const j = selectedJournals[i];
+    showProgress(i, selectedJournals.length, `Fetching ${j.name}...`);
+    try {
+      let parsed = [];
+      if (j.type === 'openalex') {
+        parsed = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, cutoff);
+      } else {
+        const xml = await fetchWithProxy(j.rss);
+        parsed = parseRSS(xml, j.name, cutoff);
+      }
+      allPapers.push(...parsed);
+    } catch(e) {
+      fetchErrors.push(`${j.name}: ${e.message}`);
+    }
+  }
+
+  showProgress(selectedJournals.length, selectedJournals.length, `Fetched ${allPapers.length} papers from ${selectedJournals.length - fetchErrors.length} journals`);
+
+  if (fetchErrors.length) {
+    showError(`Some feeds failed: ${fetchErrors.join(' | ')}. Papers from other journals will still be scored.`);
+  }
+
+  if (allPapers.length === 0) {
+    clearProgress();
+    showError('No papers found. Try increasing "Days back", or check that journals are selected.');
+    fetchBtn.disabled = false;
+    stopBtn.style.display = 'none';
+    document.getElementById('status-line').textContent = 'ready';
+    return;
+  }
+
+  // Deduplicate by id
+  const seen = new Set();
+  allPapers = allPapers.filter(p => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+
+  // Hard cap: never score more than 1000 papers in a single run
+  const MAX_PAPERS_TOTAL = 1000;
+  if (allPapers.length > MAX_PAPERS_TOTAL) {
+    showError(`Fetched ${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}. Reduce "Days back" or deselect high-volume feeds (cs.LG, stat.ML) to stay under the limit.`);
+    allPapers = allPapers.slice(0, MAX_PAPERS_TOTAL);
+  }
+
+  // Abstract enrichment: fill gaps left by publisher copyright restrictions
+  // using Semantic Scholar, which has broader abstract agreements.
+  // Mutates allPapers in-place; benefits both scoring and brief generation.
+  const noAbstractCount = allPapers.filter(p => !p.abstract || !p.abstract.trim()).length;
+  if (noAbstractCount > 0) {
+    showProgress(selectedJournals.length, selectedJournals.length,
+      `Enriching ${noAbstractCount} missing abstracts via Semantic Scholar…`);
+    await enrichAbstracts(allPapers);
+  }
+
+  // Step 1.5: Split by score cache — skip re-scoring papers already seen by Sonnet
+  const cachedResults = [];
+  const uncachedPapers = [];
+  allPapers.forEach(p => {
+    if (scoreCache[p.id] !== undefined) {
+      cachedResults.push({ ...p, score: scoreCache[p.id].score, reason: scoreCache[p.id].reason });
+    } else {
+      uncachedPapers.push(p);
+    }
+  });
+
+  // Step 2: Warn if large uncached batch
+  const PAPER_WARN_THRESHOLD = 300;
+  if (uncachedPapers.length > PAPER_WARN_THRESHOLD) {
+    const batchCount = Math.ceil(uncachedPapers.length / 20);
+    const estimatedMins = Math.ceil(batchCount * 0.5);
+    const estimatedCost = (uncachedPapers.length * 0.0012).toFixed(2);
+    const proceed = confirm(
+      `${uncachedPapers.length} papers to score (${cachedResults.length} served from cache).\n\n` +
+      `Estimated cost: ~$${estimatedCost} (Sonnet, ~$0.12 per 100 papers).\n` +
+      `Estimated time: ~${estimatedMins}–${estimatedMins + 2} minutes.\n\n` +
+      `To reduce scope: uncheck high-volume feeds (cs.LG, stat.ML) or reduce "Days back".\n\n` +
+      `Proceed anyway?`
+    );
+    if (!proceed) {
+      clearProgress();
+      stopBtn.style.display = 'none';
+      fetchBtn.disabled = false;
+      document.getElementById('status-line').textContent = 'cancelled';
+      return;
+    }
+  }
+
+  // Step 3: Score uncached papers (single-pass Sonnet, or two-pass Haiku → Sonnet)
+  const priorityAuthors = document.getElementById('authors-input').value.trim();
+  const abstractChars   = parseInt(document.getElementById('abstract-chars').value) || 0;
+  let newScored = [];
+  let haikuFilteredCount = 0;
+
+  if (uncachedPapers.length > 0) {
+    if (haikusPrefilter) {
+      document.getElementById('status-line').textContent =
+        `prefiltering ${uncachedPapers.length} papers with Haiku...`;
+      const haikuScored = await scorePapers(
+        uncachedPapers, profile, priorityAuthors, apiKey,
+        (cur, tot, msg) => {
+          showProgress(cur + selectedJournals.length, tot + selectedJournals.length,
+            `Haiku prefilter: ${msg}`);
+        },
+        MODEL_HAIKU, abstractChars
+      );
+      const haikuThreshold = parseInt(document.getElementById('haiku-threshold').value) || 3;
+      const survivors = haikuScored.filter(p => p.score > haikuThreshold);
+      haikuFilteredCount = uncachedPapers.length - survivors.length;
+      if (!abortRequested) {
+        document.getElementById('status-line').textContent =
+          `Haiku dropped ${haikuFilteredCount} (≤${haikuThreshold}) · scoring ${survivors.length} with Sonnet...`;
+        newScored = await scorePapers(
+          survivors, profile, priorityAuthors, apiKey,
+          (cur, tot, msg) => {
+            showProgress(cur + selectedJournals.length + uncachedPapers.length,
+              tot + selectedJournals.length + uncachedPapers.length, msg);
+          },
+          MODEL, abstractChars
+        );
+      }
+    } else {
+      document.getElementById('status-line').textContent =
+        `scoring ${uncachedPapers.length} papers...`;
+      newScored = await scorePapers(uncachedPapers, profile, priorityAuthors, apiKey, (cur, tot, msg) => {
+        showProgress(cur + selectedJournals.length, tot + selectedJournals.length, msg);
+      }, MODEL, abstractChars);
+    }
+
+    // Save new Sonnet scores to cache (skip API error entries which have score 0)
+    newScored.forEach(p => {
+      if (p.score > 0) scoreCache[p.id] = { score: p.score, reason: p.reason };
+    });
+    saveScoreCache();
+  }
+
+  // Merge cached and freshly scored results
+  const scored = [...cachedResults, ...newScored];
+
+  // Capture which IDs are genuinely new BEFORE marking all as seen
+  newIdsThisRun = new Set(scored.map(p => p.id).filter(id => !seenIds.has(id)));
+  scored.forEach(p => seenIds.add(p.id));
+  saveSeenIds();
+
+  papers = scored;  // keep all, including score:0 (API errors)
+
+  clearProgress();
+  stopBtn.style.display = 'none';
+  fetchBtn.disabled = false;
+  const now = new Date();
+  localStorage.setItem('litmonitor_last_fetch', now.toISOString());
+  localStorage.setItem('litmonitor_last_count', scored.length);
+  const cacheNote = cachedResults.length ? ` · ${cachedResults.length} from cache` : '';
+  const stoppedNote = abortRequested ? ' · stopped early' : '';
+  document.getElementById('status-line').textContent = haikusPrefilter && uncachedPapers.length > 0
+    ? `last run: ${now.toLocaleTimeString()} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku ⚡${cacheNote}${stoppedNote}`
+    : `last run: ${now.toLocaleTimeString()} · ${scored.length} papers scored${cacheNote}${stoppedNote}`;
+
+  renderPapers();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+
+// Profile group toggle — defined here so loadState() can call setProfileCollapsed
+function setProfileCollapsed(collapsed) {
+  const toggle = document.getElementById('profile-toggle');
+  const content = document.getElementById('profile-content');
+  toggle.classList.toggle('collapsed', collapsed);
+  content.classList.toggle('collapsed', collapsed);
+  document.getElementById('sidebar').classList.toggle('profile-open', !collapsed);
+  // collapsed state is intentionally not persisted — profile reopens each session
+}
+document.getElementById('profile-toggle').addEventListener('click', () => {
+  const isCollapsed = document.getElementById('profile-content').classList.contains('collapsed');
+  setProfileCollapsed(!isCollapsed);
+});
+
+// ── VERSION STAMP ─────────────────────────────────────────────────────────────
+// Populate version-bearing elements from the single VERSION constant above.
+document.title = `LitMonitor Earth ${VERSION}`;
+document.getElementById('app-footer').innerHTML =
+  `LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026`;
+
+buildJournalList();
+// Profile is open by default — loadState() may override this if user previously collapsed it
+document.getElementById('sidebar').classList.add('profile-open');
+loadState();
+loadScoreCache();
+updateJournalCount();
+
+// Sync Haiku prefilter button to its initial state (on by default)
+(function() {
+  const btn = document.getElementById('prefilter-btn');
+  btn.classList.toggle('btn-active', haikusPrefilter);
+  if (haikusPrefilter) {
+    const thresh = document.getElementById('haiku-threshold').value || 3;
+    btn.title = `Haiku prefilter ON — papers scoring ≤ ${thresh} with Haiku will be dropped before Sonnet scores. Click to disable.`;
+  }
+})();
+
+// Filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderPapers();
+  });
+});
+
+// Search
+document.getElementById('search-box').addEventListener('input', e => {
+  searchQuery = e.target.value.trim();
+  renderPapers();
+});
+
+// Min score change
+document.getElementById('min-score').addEventListener('change', () => { saveSettings(); renderPapers(); });
+
+// API key show/hide
+const EYE_OPEN   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_CLOSED = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+document.getElementById('key-toggle-btn').addEventListener('click', () => {
+  const inp = document.getElementById('api-key-input');
+  const btn = document.getElementById('key-toggle-btn');
+  const showing = inp.type === 'password';
+  inp.type = showing ? 'text' : 'password';
+  btn.innerHTML = showing ? EYE_CLOSED : EYE_OPEN;
+});
+
+// Stop button
+document.getElementById('stop-btn').addEventListener('click', () => {
+  abortRequested = true;
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('status-line').textContent = 'stopping after current batch…';
+});
+
+// Haiku Prefilter toggle
+document.getElementById('prefilter-btn').addEventListener('click', () => {
+  haikusPrefilter = !haikusPrefilter;
+  const btn = document.getElementById('prefilter-btn');
+  btn.classList.toggle('btn-active', haikusPrefilter);
+  const thresh = document.getElementById('haiku-threshold').value || 3;
+  btn.title = haikusPrefilter
+    ? `Haiku prefilter ON — papers scoring ≤ ${thresh} with Haiku will be dropped before Sonnet scores. Click to disable.`
+    : 'Use Haiku to pre-filter low-scoring papers before Sonnet scoring (saves cost)';
+});
+
+// Save on change
+['context-input', 'api-key-input', 'prioritize-input', 'methods-input', 'downgrade-input', 'authors-input', 'days-back', 'haiku-threshold', 'abstract-chars'].forEach(id => {
+  document.getElementById(id).addEventListener('change', saveSettings);
+});
+
+// Character counter for Research Context
+(function() {
+  const contextEl = document.getElementById('context-input');
+  const countEl   = document.getElementById('context-count');
+  const updateContextCount = () => {
+    const n = contextEl.value.length;
+    countEl.textContent = n;
+    countEl.style.color = n > 140 ? 'var(--amber, #f59e0b)' : '';
+  };
+  contextEl.addEventListener('input', updateContextCount);
+  updateContextCount(); // initialise on load
+})();
+
+// Export
+document.getElementById('export-btn').addEventListener('click', exportVisible);
+
+
+// ── EXPORT BRIEF ──────────────────────────────────────────────────────────────
+document.getElementById('brief-btn').addEventListener('click', async () => {
+  const briefBtn = document.getElementById('brief-btn');
+  const apiKey   = document.getElementById('api-key-input').value.trim();
+  if (!apiKey) { alert('Please enter your API key first.'); return; }
+
+  const visible = getVisiblePapers();  // honours current filter, min-score, and search
+  if (!visible.length) { alert('No papers are currently shown — nothing to brief.'); return; }
+
+  // Cap at 20 papers to keep token usage reasonable
+  const MAX_PAPERS = 20;
+  const allCapped = visible.slice(0, MAX_PAPERS);
+  const omitted   = visible.length - allCapped.length;
+
+  // Papers without abstracts are shown in the brief with a placeholder — NOT sent to Sonnet.
+  const toBrief       = allCapped.filter(p => p.abstract && p.abstract.trim());
+  const noAbstractIds = new Set(allCapped.filter(p => !p.abstract || !p.abstract.trim()).map(p => p.id));
+
+  // Resolve theme and color vars BEFORE opening the window so both the
+  // loading page and the final page use the same values.
+  const isLight   = document.documentElement.getAttribute('data-theme') === 'light';
+  const themeVars = isLight
+    ? `--bg:#f8faf8;--surface:#ffffff;--border:#ccd6ce;--text:#1a201c;--text2:#3d5443;--text3:#7a8e80;--accent:#16a34a;`
+    : `--bg:#0d0f0e;--surface:#141816;--border:#2a2f2c;--text:#e8ede9;--text2:#8fa494;--text3:#5a6b5e;--accent:#4ade80;`;
+  const hiCol  = isLight ? '#16a34a' : '#4ade80';
+  const midCol = isLight ? '#d97706' : '#fbbf24';
+  const loCol  = isLight ? '#dc2626' : '#f87171';
+
+  // Open the output window SYNCHRONOUSLY before any async work.
+  // Browsers block window.open() called after an await.
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('Popup was blocked. Please allow popups for this page and try again.');
+    return;
+  }
+  // Loading page: full masthead + footer so the page doesn't flash unstyled.
+  win.document.write(`<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Generating Brief…</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root{${themeVars}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;font-size:15px;line-height:1.65;color:var(--text);background:var(--bg);margin:0;padding:2.5rem 1.5rem 5rem}
+  .wrap{max-width:720px;margin:0 auto}
+  .masthead{margin-bottom:1.8rem;border-bottom:2px solid var(--text);padding-bottom:0.8rem}
+  .wordmark{font-family:'Fraunces',serif;font-size:22px;font-weight:300;font-style:italic;letter-spacing:-0.02em;color:var(--text);margin-bottom:0.2rem}
+  .wm-monitor{color:var(--accent);font-style:normal;font-weight:300}
+  .wm-earth{color:var(--text2);font-style:normal;font-weight:300}
+  .wm-sub{font-family:system-ui,sans-serif;font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text2);font-style:normal;vertical-align:middle;margin-left:0.4rem}
+  .loading{font-size:0.9rem;color:var(--text2);font-style:italic;padding:1.5rem 0}
+  footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+</style>
+</head><body>
+<div class="wrap">
+  <div class="masthead">
+    <div class="wordmark">Lit<span class="wm-monitor">Monitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Research Brief</span></div>
+  </div>
+  <p class="loading">Generating briefs for ${toBrief.length} paper${toBrief.length !== 1 ? 's' : ''} — please wait…</p>
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+</div></body></html>`);
+
+  const origLabel      = briefBtn.textContent;
+  briefBtn.disabled    = true;
+  briefBtn.textContent = 'Generating…';
+
+  try {
+    // Build numbered paper list from toBrief only (papers WITH abstracts).
+    // Full abstracts used here — no truncation for brief generation.
+    const paperList = toBrief.map((p, i) => {
+      const parts = [`PAPER ${i + 1}: ${p.title}`];
+      if (p.journal) parts.push(`Journal: ${p.journal}`);
+      parts.push(`Abstract: ${p.abstract}`);
+      return parts.join('\n');
+    }).join('\n\n');
+
+    const context    = document.getElementById('context-input').value.trim();
+    const prioritize = document.getElementById('prioritize-input').value.trim();
+    const methods    = document.getElementById('methods-input').value.trim();
+
+    const profileBlock = [
+      context    ? `Who I am: ${context}`                    : '',
+      prioritize ? `I prioritize: ${prioritize}`             : '',
+      methods    ? `Methods I find transferable: ${methods}` : '',
+    ].filter(Boolean).join('\n');
+
+    // briefById maps paper id → raw brief text from the API.
+    // Declared here so it's always in scope for the card renderer below,
+    // even when we skip the Sonnet call entirely.
+    const briefById = {};
+
+    // Only call Sonnet if there are papers with abstracts to brief.
+    if (toBrief.length > 0) {
+      const systemPrompt = `You are a research intelligence analyst writing tightly scoped briefings for a scientist. For each paper write 2–3 bullet points using "-" as the prefix, one bullet per line. The first 1–2 bullets state why the paper matters to the field: the key finding, methodological advance, empirical result, or claim that makes it significant. Be specific — cite numbers, name the method, state the concrete contribution. No generic summaries. The final bullet states why this paper is directly relevant to this specific researcher's work and interests. Be direct. Do not hedge. HARD LIMIT: every bullet must be 15 words or fewer. Cut ruthlessly.`;
+
+      const userPrompt = `RESEARCHER PROFILE:
+${profileBlock || '(not provided)'}
+
+Write a 2–3 bullet brief for EACH of the ${toBrief.length} papers below. Use "-" for each bullet, one per line. First 1–2 bullets = why the paper matters (key finding, what's new, why the field should care). Final bullet = direct relevance to this researcher. Use this exact format — the delimiter lines are required for parsing:
+
+===1===
+- [key finding or advance]
+- [additional finding or significance, if needed]
+- [direct relevance to this researcher]
+
+===2===
+- [key finding or advance]
+- [additional finding or significance, if needed]
+- [direct relevance to this researcher]
+
+...and so on through ===${toBrief.length}===.
+
+PAPERS:
+${paperList}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 2000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error?.message || `API error ${response.status}`);
+      }
+
+      const apiData = await response.json();
+      const rawText = (apiData.content?.[0]?.text || '').trim();
+
+      // Parse per-paper briefs using the ===N=== delimiters.
+      // Indices correspond to toBrief (1-based), NOT allCapped.
+      // Split produces: ['', '1', 'brief1', '2', 'brief2', ...]
+      const parts = rawText.split(/===(\d+)===/);
+      const briefsByIdx = {};
+      for (let i = 1; i < parts.length - 1; i += 2) {
+        briefsByIdx[parseInt(parts[i])] = parts[i + 1].trim();
+      }
+      toBrief.forEach((p, i) => { briefById[p.id] = briefsByIdx[i + 1] || ''; });
+    }
+
+    // Build HTML cards — one per paper in allCapped (preserves score order)
+    const dateStr   = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toLocaleString();
+
+    // themeVars, hiCol, midCol, loCol already resolved before window.open() above.
+    const cards = allCapped.map((p) => {
+      const scoreCol  = p.score >= 8 ? hiCol : p.score >= 6 ? midCol : loCol;
+      const titleHtml = p.link
+        ? `<a href="${p.link}" target="_blank" rel="noopener">${escHtml(p.title)}</a>`
+        : escHtml(p.title);
+      const date = p.date ? (p.date instanceof Date ? p.date : new Date(p.date)) : null;
+      const mo   = date && !isNaN(date)
+        ? date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
+      const auth = p.authors
+        ? p.authors.split(',').slice(0, 3).join(', ') + (p.authors.split(',').length > 3 ? ' et al.' : '')
+        : '';
+
+      let briefHtml;
+      if (noAbstractIds.has(p.id)) {
+        // No abstract — show placeholder, no bullets
+        briefHtml = `<p class="no-abstract-note">No abstract available — brief not generated.</p>`;
+      } else {
+        const rawBrief   = briefById[p.id] || '';
+        const bulletLines = rawBrief.split('\n')
+          .map(l => l.trim())
+          .filter(l => l.startsWith('-') || l.startsWith('•'))
+          .map(l => l.replace(/^[-•]\s*/, ''));
+        briefHtml = bulletLines.length
+          ? `<ul class="brief-bullets">${bulletLines.map(l => `<li>${escHtml(l)}</li>`).join('')}</ul>`
+          : `<p style="font-size:0.87rem;color:var(--text2);font-style:italic">${escHtml(rawBrief || '(brief not generated)')}</p>`;
+      }
+
+      return `<div class="card">
+  <div class="card-header">
+    <span class="score-badge" style="color:${scoreCol};border-color:${scoreCol}">${p.score}</span>
+    <div class="card-title">${titleHtml}</div>
+  </div>
+  <div class="card-meta">${escHtml(p.journal)}${mo ? ' &middot; ' + escHtml(mo) : ''}${auth ? ' &middot; ' + escHtml(auth) : ''}</div>
+  <div class="card-brief">${briefHtml}</div>
+  ${!noAbstractIds.has(p.id) ? `<details><summary>Abstract</summary><p class="abstract">${escHtml(p.abstract)}</p></details>` : ''}
+</div>`;
+    }).join('\n');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Research Brief — ${dateStr}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root{${themeVars}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;font-size:15px;line-height:1.65;color:var(--text);background:var(--bg);margin:0;padding:2.5rem 1.5rem 5rem}
+  .wrap{max-width:720px;margin:0 auto}
+  .masthead{margin-bottom:1.8rem;border-bottom:2px solid var(--text);padding-bottom:0.8rem}
+  .wordmark{font-family:'Fraunces',serif;font-size:22px;font-weight:300;font-style:italic;letter-spacing:-0.02em;color:var(--text);margin-bottom:0.2rem}
+  .wm-monitor{color:var(--accent);font-style:normal;font-weight:300}
+  .wm-earth{color:var(--text2);font-style:normal;font-weight:300}
+  .wm-sub{font-family:system-ui,sans-serif;font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text2);font-style:normal;vertical-align:middle;margin-left:0.4rem}
+  .dateline{font-size:0.78rem;color:var(--text2)}
+  .notice{font-size:0.8rem;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:5px;padding:0.5rem 0.8rem;margin-bottom:1.5rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.1rem 1.3rem;margin-bottom:1rem}
+  .card-header{display:flex;gap:0.75rem;align-items:flex-start;margin-bottom:0.3rem}
+  .score-badge{flex-shrink:0;font-weight:700;font-size:0.8rem;border:1.5px solid;border-radius:4px;padding:1px 6px;line-height:1.6;margin-top:1px}
+  .card-title{font-size:0.95rem;font-weight:600;line-height:1.4;color:var(--text)}
+  .card-title a{color:var(--accent);text-decoration:none}
+  .card-title a:hover{text-decoration:underline}
+  .card-meta{font-size:0.75rem;color:var(--text2);margin-bottom:0.7rem;padding-left:2.2rem}
+  .card-brief{padding-left:2.2rem;margin-bottom:0.3rem}
+  .brief-bullets{margin:0;padding-left:1rem;list-style:disc}
+  .brief-bullets li{font-size:0.87rem;line-height:1.6;color:var(--text);margin-bottom:0.3rem}
+  .brief-bullets li:last-child{color:var(--text);margin-bottom:0}
+  .no-abstract-note{font-size:0.83rem;color:var(--text3);font-style:italic;margin:0.2rem 0 0.3rem}
+  details{padding-left:2.2rem;margin-top:0.5rem}
+  summary{cursor:pointer;font-size:0.78rem;color:var(--text2)}
+  .abstract{font-size:0.83rem;line-height:1.6;color:var(--text);margin:0.4rem 0 0}
+  .dl-btn{position:fixed;top:1rem;right:1rem;background:var(--accent);color:${isLight ? '#fff' : '#0d0f0e'};border:none;border-radius:6px;padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+</style>
+</head>
+<body>
+<button class="dl-btn" onclick="dlPage('litmonitor-brief-${dateStr}.html')">↓ Download</button>
+<div class="wrap">
+  <div class="masthead">
+    <div class="wordmark">Lit<span class="wm-monitor">Monitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Research Brief</span></div>
+    <div class="dateline">${timestamp} &middot; ${allCapped.length} papers (${toBrief.length} briefed) &middot; min score ${document.getElementById('min-score').value}</div>
+  </div>
+  ${omitted > 0 ? `<div class="notice">${omitted} additional paper${omitted > 1 ? 's were' : ' was'} shown but not included (brief cap is ${MAX_PAPERS}). Raise your min score to reduce the list.</div>` : ''}
+  ${cards}
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+</div>
+<script>
+function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
+<\/script>
+</body>
+</html>`;
+
+    // Navigate the popup to a Blob URL — more reliable than document.write()
+    // after an async operation, which browsers may silently ignore.
+    const blob   = new Blob([html], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    win.location.replace(blobUrl);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+  } catch (err) {
+    const errHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title>
+<style>body{font-family:system-ui,sans-serif;padding:3rem;color:#b91c1c;background:#fafaf8}</style>
+</head><body><p><strong>Brief generation failed:</strong> ${escHtml(err.message)}</p></body></html>`;
+    const errBlob = new Blob([errHtml], { type: 'text/html' });
+    win.location.replace(URL.createObjectURL(errBlob));
+  } finally {
+    briefBtn.disabled    = false;
+    briefBtn.textContent = origLabel;
+  }
+});
+
+// Theme toggle
+(function() {
+  const btn = document.getElementById('theme-toggle-btn');
+  const saved = localStorage.getItem('litmonitor_theme');
+  if (saved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    btn.textContent = '🌙 Dark';
+  }
+  btn.addEventListener('click', () => {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      document.documentElement.removeAttribute('data-theme');
+      btn.textContent = '☀ Light';
+      localStorage.setItem('litmonitor_theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      btn.textContent = '🌙 Dark';
+      localStorage.setItem('litmonitor_theme', 'light');
+    }
+  });
+})();
+
+// Journal select all / none
+document.getElementById('journals-all-btn').addEventListener('click', () => {
+  document.querySelectorAll('[data-journal-id]').forEach(cb => {
+    cb.checked = true;
+    cb.closest('.journal-item').classList.add('checked');
+  });
+  saveSettings();
+  updateJournalCount();
+});
+document.getElementById('journals-none-btn').addEventListener('click', () => {
+  document.querySelectorAll('[data-journal-id]').forEach(cb => {
+    cb.checked = false;
+    cb.closest('.journal-item').classList.remove('checked');
+  });
+  saveSettings();
+  updateJournalCount();
+});
+
+// Clear cache
+document.getElementById('clear-cache-btn').addEventListener('click', () => {
+  if (confirm('Clear all caches? This will re-score all papers on the next run and mark them as "new" again.')) {
+    seenIds.clear();
+    saveSeenIds();
+    dismissed.clear();
+    saveDismissed();
+    scoreCache = {};
+    saveScoreCache();
+    document.getElementById('status-line').textContent = 'cache cleared';
+  }
+});
+
+// Docs button
+document.getElementById('docs-btn').addEventListener('click', openDocs);
+
+function openDocs() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const themeVars = isLight
+    ? `--bg:#f8faf8;--surface:#ffffff;--border:#ccd6ce;--text:#1a201c;--text2:#3d5443;--text3:#7a8e80;--accent:#16a34a;--amber:#d97706;--red:#dc2626;`
+    : `--bg:#0d0f0e;--surface:#141816;--border:#2a2f2c;--text:#e8ede9;--text2:#8fa494;--text3:#5a6b5e;--accent:#4ade80;--amber:#fbbf24;--red:#f87171;`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LitMonitor Earth — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+  :root{${themeVars}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;font-size:15px;line-height:1.7;color:var(--text);background:var(--bg);margin:0;padding:2.5rem 1.5rem 6rem}
+  .wrap{max-width:720px;margin:0 auto}
+  .masthead{margin-bottom:2rem;border-bottom:2px solid var(--text);padding-bottom:0.8rem}
+  .wordmark{font-family:'Fraunces',serif;font-size:22px;font-weight:300;font-style:italic;letter-spacing:-0.02em;color:var(--text);margin-bottom:0.25rem}
+  .wm-monitor{color:var(--accent);font-style:normal;font-weight:300}
+  .wm-earth{color:var(--text2);font-style:normal;font-weight:300}
+  .wm-sub{font-family:system-ui,sans-serif;font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text2);font-style:normal;vertical-align:middle;margin-left:0.4rem}
+  .dateline{font-size:0.78rem;color:var(--text2)}
+  /* TOC */
+  .toc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem 1.3rem;margin-bottom:2rem}
+  .toc-title{font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text2);margin-bottom:0.6rem}
+  .toc ol{margin:0;padding-left:1.2rem}
+  .toc li{font-size:0.85rem;line-height:1.8;color:var(--text2)}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .toc a{color:var(--accent);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  /* sections */
+  .doc-section{margin-bottom:2.5rem}
+  h2{font-family:'Fraunces',serif;font-size:1.25rem;font-weight:300;font-style:italic;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:0.4rem;margin:0 0 1rem}
+  h3{font-size:0.8rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin:1.2rem 0 0.4rem}
+  p{margin:0 0 0.85rem;color:var(--text)}
+  /* field cards */
+  .field-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.9rem 1.1rem;margin-bottom:0.75rem}
+  .field-name{font-size:0.78rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text2);margin-bottom:0.3rem}
+  .field-body{font-size:0.875rem;line-height:1.65;color:var(--text)}
+  .field-body p{margin:0 0 0.5rem}
+  .field-body p:last-child{margin-bottom:0}
+  /* score chips */
+  .chip{display:inline-block;font-size:0.72rem;font-weight:700;padding:1px 7px;border-radius:3px;border:1.5px solid;margin-right:4px;vertical-align:middle}
+  .chip-hi{color:var(--accent);border-color:var(--accent)}
+  .chip-mid{color:var(--amber);border-color:var(--amber)}
+  .chip-lo{color:var(--red);border-color:var(--red)}
+  /* tip box */
+  .tip{background:var(--surface);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:0.6rem 1rem;margin:0.8rem 0;font-size:0.85rem;color:var(--text2)}
+  .tip strong{color:var(--text)}
+  /* kbd */
+  kbd{font-family:system-ui,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--text2)}
+  /* inline label */
+  .ui-label{font-family:system-ui,monospace;font-size:0.8rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--text);white-space:nowrap}
+  footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+  .dl-btn{position:fixed;top:1rem;right:1rem;background:var(--accent);color:${isLight ? '#fff' : '#0d0f0e'};border:none;border-radius:6px;padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+</style>
+</head>
+<body>
+<button class="dl-btn" onclick="dlPage('litmonitor-docs.html')">&#8595; Download</button>
+<div class="wrap">
+
+  <div class="masthead">
+    <div class="wordmark">Lit<span class="wm-monitor">Monitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Documentation</span></div>
+    <div class="dateline">${VERSION} &middot; User Guide</div>
+  </div>
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#overview">What is LitMonitor?</a></li>
+      <li><a href="#getting-started">Getting Started</a></li>
+      <li><a href="#settings">Fetch Settings</a></li>
+      <li><a href="#profile">Research Profile</a></li>
+      <li><a href="#scoring">How Scoring Works</a></li>
+      <li><a href="#journals">Journals</a></li>
+      <li><a href="#fetch">Fetch &amp; Score</a></li>
+      <li><a href="#results">Reading Results</a></li>
+      <li><a href="#filter">Filter &amp; Search</a></li>
+      <li><a href="#export">Export</a></li>
+      <li><a href="#brief">&#10022; Research Brief</a></li>
+      <li><a href="#tips">Tips &amp; Best Practices</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. OVERVIEW -->
+  <div class="doc-section" id="overview">
+    <h2>1. What is LitMonitor?</h2>
+    <p>LitMonitor Earth is a personal literature monitoring tool for earth and climate scientists. It fetches recent papers from a curated set of journals and arXiv feeds, then uses Claude (Anthropic's AI) to score each paper 1–10 for relevance to your specific research profile. High-scoring papers surface at the top; low-scoring ones stay out of the way.</p>
+    <p>Everything runs in your browser. No server, no data stored externally — your Claude API key and profile are saved only in your browser's local storage.</p>
+  </div>
+
+  <!-- 2. GETTING STARTED -->
+  <div class="doc-section" id="getting-started">
+    <h2>2. Getting Started</h2>
+
+    <h3>Step 1 — Get an Anthropic API key</h3>
+    <p>LitMonitor uses the Claude API to score papers. You need an Anthropic API key from <strong>console.anthropic.com</strong>. Paste it into the <span class="ui-label">Anthropic API Key</span> field at the top of the sidebar. The key is stored in your browser's local storage and is never sent anywhere except directly to the Anthropic API.</p>
+
+    <h3>Step 2 — Fill in your Research Profile</h3>
+    <p>Click <span class="ui-label">Profile &#9662;</span> in the sidebar to expand the profile section. Fill in at least the <em>Prioritize</em> or <em>Transferable Methods</em> fields. The more specific your profile, the more useful the scores will be. See <a href="#profile">Section 4</a> for details on each field.</p>
+
+    <h3>Step 3 — Select journals</h3>
+    <p>Scroll down to the <span class="ui-label">Journals</span> section and check the sources you want to monitor. All journals are checked by default. Deselecting high-volume arXiv feeds (cs.LG, stat.ML) significantly reduces the number of papers and API cost per run.</p>
+
+    <h3>Step 4 — Fetch &amp; Score</h3>
+    <p>Click the <span class="ui-label">&#8595; Fetch &amp; Score</span> button. LitMonitor will pull recent papers from each selected source and then ask Claude to score them for you. Results appear as scored cards in the main feed, sorted highest score first.</p>
+  </div>
+
+  <!-- 3. SETTINGS -->
+  <div class="doc-section" id="settings">
+    <h2>3. Fetch Settings</h2>
+
+    <div class="field-card">
+      <div class="field-name">Fetch days back</div>
+      <div class="field-body">
+        <p>How many calendar days back to look when fetching papers. A value of <strong>2</strong> fetches papers published in the last two days. Increase to catch up after a weekend or holiday. Note that arXiv RSS feeds return a fixed number of recent items regardless of date, so very large values mainly affect OpenAlex journal fetches.</p>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-name">&#9889; Haiku Prefilter (button + threshold)</div>
+      <div class="field-body">
+        <p>The <span class="ui-label">&#9889; Haiku Prefilter</span> toggle in the header activates a two-pass scoring pipeline. It is <strong>on by default</strong> and is the primary cost-saving mechanism.</p>
+        <p><strong>Pass 1 (Haiku):</strong> All uncached papers are scored quickly and cheaply by Claude Haiku. Any paper scoring at or below the <em>Haiku drop if &#8804;</em> threshold is discarded without being sent to Sonnet.</p>
+        <p><strong>Pass 2 (Sonnet):</strong> Only the survivors are scored by Claude Sonnet, which provides the final scores you see in the feed.</p>
+        <p>The <span class="ui-label">Haiku drop if &#8804;</span> setting (default: 3) controls the cutoff. Raise it to filter more aggressively (saves more cost but risks dropping borderline papers); lower it to be more conservative.</p>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-name">Abstract chars (scoring)</div>
+      <div class="field-body">
+        <p>Controls how many characters of each paper's abstract are sent to Haiku and Sonnet during scoring. Options: <strong>300</strong>, <strong>500</strong> (default), <strong>800</strong>, <strong>1000</strong>, <strong>1500</strong>, or <strong>&#8734; all</strong>.</p>
+        <p>Most of the relevance signal is in the first few hundred characters of an abstract, so truncating saves input tokens without meaningfully affecting score quality. This setting only applies to scoring — the full abstract is always used for &#10022; Research Brief generation and for the inline abstract toggle in the feed.</p>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-name">&#9632; Stop button</div>
+      <div class="field-body">
+        <p>While a Fetch &amp; Score run is in progress, a red <span class="ui-label">&#9632; Stop</span> button appears in the header. Clicking it sets an abort flag that halts the run after the current in-flight scoring batch completes. Papers scored up to that point are displayed normally. The status line will show <em>· stopped early</em> to indicate the run was not completed.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. PROFILE -->
+  <div class="doc-section" id="profile">
+    <h2>4. Research Profile</h2>
+    <p>The profile tells Claude who you are and what to prioritize. It is assembled into a prompt sent with every scoring request. All fields are optional but the more you fill in, the more accurate the scores.</p>
+
+    <div class="field-card">
+      <div class="field-name">Research Context <span style="font-weight:normal;text-transform:none;letter-spacing:normal;font-size:0.8rem">(max 160 chars)</span></div>
+      <div class="field-body">
+        <p>A one-sentence description of who you are and what you work on. This is used as background context for all scoring decisions. Keep it concise — it has a 160-character limit. Example: <em>"I am a climate scientist with extensive AI knowledge working at the intersection of machine learning and climate/earth science."</em></p>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-name">Prioritize <span class="chip chip-hi">8–10</span></div>
+      <div class="field-body">
+        <p>Topics, application areas, or contributions you want to score high. One item per line. Claude uses semantic judgment — you do not need exact keyword matches. Papers that directly advance or apply something on this list will score 8–10.</p>
+        <p>Be specific about the combination of topic and approach that matters to you. Broad topics like "machine learning" or "climate" will match too many papers; something like "AI emulators for climate model parameterizations" is far more useful.</p>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-name">Transferable Methods <span class="chip chip-hi">8–10</span></div>
+      <div class="field-body">
+        <p>Methods or techniques from <em>outside</em> your field that you would find useful if they were applied to your domain. Papers advancing these techniques on spatial, temporal, or spatiotemporal data — even in a different domain — will score 8–10 if the method would transfer naturally to earth/climate science.</p>
+        <p>This is distinct from Prioritize: use Prioritize for what you directly work on; use Transferable Methods for techniques you are watching from adjacent fields (e.g., uncertainty quantification, representation learning, OOD detection).</p>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-name">Downgrade <span class="chip chip-lo">1–4</span></div>
+      <div class="field-body">
+        <p>Topics or paper types you are <em>not</em> interested in. Papers matching items on this list will score 1–4 unless they also strongly match a Prioritize or Transferable Methods item. Use this to suppress high-volume topics that appear in your journals but aren't relevant to your work.</p>
+        <p>Examples: <em>"Purely observational studies with no ML component"</em>, <em>"Standard numerical weather prediction without novel AI"</em>, <em>"Regional case studies without generalizable methods"</em>.</p>
+      </div>
+    </div>
+
+    <div class="field-card">
+      <div class="field-name">Priority Authors <span class="chip chip-hi">8–10</span></div>
+      <div class="field-body">
+        <p>Names of researchers whose papers you always want to see, regardless of topic. One name per line. Papers with any matching author — including co-authors — will score 8–10. Claude uses fuzzy matching on last name and first initial, so minor name variations are handled gracefully.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. SCORING -->
+  <div class="doc-section" id="scoring">
+    <h2>5. How Scoring Works</h2>
+    <p>Papers are scored 1–10 by Claude Sonnet (or Haiku in the prefilter pass) using your assembled profile. Papers are sent in batches of 20. Each paper's title, authors, journal, and abstract are provided. Claude returns a score and a one-sentence reason for each paper.</p>
+    <p><strong>Score caching:</strong> Once a paper has been scored by Sonnet, its score and reason are saved in your browser's local storage under a score cache. On subsequent runs, any paper whose ID already appears in the cache is displayed immediately without making an API call — so re-running across overlapping date windows costs nothing for papers you have already scored. The cache is cleared along with the rest of the app cache when you click <span class="ui-label">Clear cache</span>.</p>
+
+    <h3>Score ranges</h3>
+    <p>
+      <span class="chip chip-hi">8–10</span> Directly on-topic — strong match to Prioritize, Transferable Methods, or a Priority Author.<br>
+      <span class="chip chip-mid">5–7</span> Peripherally relevant — related but not a strong match; might inform your work.<br>
+      <span class="chip chip-lo">1–4</span> Not relevant — matches Downgrade topics or has no meaningful connection to your profile.
+    </p>
+    <p>The default <span class="ui-label">Score &#8805; 6</span> filter means you see scores 6–10: everything mid-range and above.</p>
+
+    <h3>Scoring model</h3>
+    <p>Final scores use <strong>Claude Sonnet</strong> (claude-sonnet-4-5). The Haiku prefilter uses <strong>Claude Haiku</strong> (claude-haiku-4-5). Models are pinned intentionally to keep costs predictable.</p>
+
+    <div class="tip"><strong>Tip:</strong> If papers you expect to score high are coming in at 5–7, your Prioritize list may be too vague. Add more specific entries that match the exact combination of topic and method you care about.</div>
+  </div>
+
+  <!-- 6. JOURNALS -->
+  <div class="doc-section" id="journals">
+    <h2>6. Journals</h2>
+    <p>Each source in the journal list has a small badge showing how it is fetched:</p>
+    <p><strong>api</strong> — fetched directly from the OpenAlex API (open scholarly database). Reliable, no third-party proxy needed. Abstracts are included when available.</p>
+    <p><strong>rss</strong> — fetched via an arXiv RSS feed through a CORS proxy. arXiv feeds are category-exact (e.g. cs.LG returns every paper cross-listed under cs.LG). These feeds can be very large; deselecting them reduces both run time and API cost.</p>
+    <p>Use the <span class="ui-label">All</span> and <span class="ui-label">None</span> buttons to quickly select or deselect all sources. Your selection is saved automatically.</p>
+
+    <h3>Current journal list</h3>
+    <p>AI for Earth Systems (AMS) &middot; arXiv cs.LG &middot; arXiv physics.ao-ph &middot; arXiv stat.ML &middot; BAMS &middot; Earth's Future (AGU) &middot; Environmental Data Science &middot; Environmental Research: Climate &middot; Environmental Research Letters &middot; Geoscientific Model Development &middot; GRL (AGU) &middot; JAMES (AGU) &middot; JGR-Atmospheres (AGU) &middot; Machine Learning: Earth &middot; Monthly Weather Review (AMS) &middot; Nature &middot; Nature Climate Change &middot; Nature Communications &middot; npj Climate and Atmospheric Science &middot; Science (AAAS) &middot; Science Advances (AAAS) &middot; Scientific Reports (Nature)</p>
+  </div>
+
+  <!-- 7. FETCH & SCORE -->
+  <div class="doc-section" id="fetch">
+    <h2>7. Fetch &amp; Score</h2>
+    <p>Clicking <span class="ui-label">&#8595; Fetch &amp; Score</span> runs the full pipeline:</p>
+    <p><strong>1. Fetch</strong> — Papers are pulled from each selected journal or arXiv feed using the <em>Fetch days back</em> window. A progress bar shows each source as it loads. Sources that fail (e.g. proxy timeouts) are reported as warnings; papers from other sources still proceed. A hard cap of <strong>1,000 papers</strong> is applied after fetching to prevent runaway runs.</p>
+    <p><strong>2. Deduplicate</strong> — Papers appearing in multiple sources (e.g. a paper cross-listed on arXiv and indexed in OpenAlex) are deduplicated by DOI or a title+date fingerprint.</p>
+    <p><strong>3. Abstract enrichment</strong> — Papers without an abstract are looked up against the Semantic Scholar batch API using their DOI. Semantic Scholar has broader publisher agreements than OpenAlex, so many abstracts that OpenAlex omits (e.g. from Nature Group or AAAS journals) can be recovered here. Abstracts filled in this step are used for both scoring and brief generation.</p>
+    <p><strong>4. Score cache split</strong> — Papers whose IDs appear in the local score cache are set aside and displayed immediately with their cached score and reason — no API call needed. Only uncached papers proceed to the next steps.</p>
+    <p><strong>5. Large-batch warning</strong> — If more than 300 uncached papers remain, a confirmation dialog shows the estimated run time and gives you the option to cancel and narrow your selection.</p>
+    <p><strong>6. Score</strong> — Uncached papers are sent to Claude in batches of 20. If Haiku Prefilter is active, a fast Haiku pass runs first and drops low-scoring papers; survivors are then scored by Sonnet. New Sonnet scores are saved to the local score cache for future runs.</p>
+    <p><strong>7. Results</strong> — All papers (cached + newly scored) are merged and displayed sorted by score, highest first. The status bar shows when the last run completed and how many papers were scored. At any point during steps 1–6 you can click the red <span class="ui-label">&#9632; Stop</span> button in the header to halt the run early; papers scored up to that point are shown normally.</p>
+    <div class="tip"><strong>New vs. seen:</strong> LitMonitor tracks every paper ID it has ever scored. Papers not seen in a previous run are tagged <strong>new</strong>. This tag persists across browser sessions until you clear the cache.</div>
+  </div>
+
+  <!-- 8. RESULTS -->
+  <div class="doc-section" id="results">
+    <h2>8. Reading Results</h2>
+
+    <h3>Stats bar</h3>
+    <p>Above the paper cards, a stats bar shows: <strong>Fetched</strong> (total papers scored this run), <strong>Shown</strong> (papers passing the current min-score and filter), <strong>New</strong> (papers not seen in any previous run), and <strong>Score&#8805;8</strong> (high-relevance count).</p>
+
+    <h3>Score badge</h3>
+    <p>Each card shows a score badge in the top-left corner. <span class="chip chip-hi">9</span> green = highly relevant, <span class="chip chip-mid">6</span> amber = peripheral, <span class="chip chip-lo">3</span> red = not relevant. The badge color reflects the same thresholds as the <span class="ui-label">Score &#8805; N</span> filter dropdown.</p>
+
+    <h3>Relevance reason</h3>
+    <p>Below the title and authors, a one-sentence italic reason explains why Claude assigned the score it did. This is useful for calibrating your profile over time.</p>
+
+    <h3>Card actions</h3>
+    <p><span class="ui-label">Open &#8594;</span> opens the paper's DOI link in a new tab. <span class="ui-label">Abstract</span> expands the full abstract inline. <span class="ui-label">Dismiss</span> removes the card from the current view and records the paper as dismissed, so it won't reappear in future runs.</p>
+  </div>
+
+  <!-- 9. FILTER & SEARCH -->
+  <div class="doc-section" id="filter">
+    <h2>9. Filter &amp; Search</h2>
+    <p><span class="ui-label">All</span> shows every paper at or above the min score. <span class="ui-label">New only</span> restricts the feed to papers not seen in any previous run.</p>
+    <p>The <span class="ui-label">Score &#8805; N</span> dropdown sets the minimum score threshold. Papers scoring below this value are fetched and scored but not displayed. The default is <strong>Score &#8805; 6</strong>. Raise it to see only highly relevant papers; lower it to browse more of the feed.</p>
+    <p>The search box filters by title and author name simultaneously. Results update as you type.</p>
+    <p>All filter changes are instant — no re-fetch required. The Export and Brief functions always operate on the currently visible (filtered) set of papers.</p>
+  </div>
+
+  <!-- 10. EXPORT -->
+  <div class="doc-section" id="export">
+    <h2>10. Export</h2>
+    <p>The <span class="ui-label">&#8595; Export</span> button opens a new browser tab containing a styled HTML report of all currently visible papers (respecting min score, filter, and search). The exported page includes title, journal, authors, date, Claude's relevance reason, and a collapsible abstract for each paper. A <em>Download</em> button on the export page saves the report as a self-contained HTML file you can archive or share.</p>
+    <p>The export page mirrors the current light/dark theme of the main app.</p>
+  </div>
+
+  <!-- 11. BRIEF -->
+  <div class="doc-section" id="brief">
+    <h2>11. &#10022; Research Brief</h2>
+    <p>The <span class="ui-label">&#10022; Brief</span> button generates a personalized narrative brief for each visible paper — up to 20 at a time. For each paper with an abstract, Claude produces 2–3 bullet points:</p>
+    <p><strong>Bullet 1</strong> — What is interesting, innovative, or important about this specific paper: a concrete finding, method advance, or result that sets it apart from generic topic descriptions.</p>
+    <p><strong>Bullet 2 (and optionally 3)</strong> — Why it matters to <em>you specifically</em>, based on your Research Profile, and any notable caveats or connections to your work.</p>
+    <p>Papers without an abstract are included in the brief output but show <em>No abstract available — brief not generated.</em> in place of bullets. No API call is made for those papers.</p>
+    <p>The brief opens in a new tab and can be downloaded as a self-contained HTML file. Like Export, it mirrors the current app theme.</p>
+    <div class="tip"><strong>Cost note:</strong> Brief makes a single API call to Sonnet with up to 20 papers included (only those with abstracts are sent). It uses a higher token budget than individual scoring calls — typically 1,000–1,500 output tokens. If your visible list exceeds 20 papers, a notice is shown and the remaining papers are omitted. Raise your min score to reduce the list.</div>
+  </div>
+
+  <!-- 12. TIPS -->
+  <div class="doc-section" id="tips">
+    <h2>12. Tips &amp; Best Practices</h2>
+
+    <h3>Controlling cost</h3>
+    <p>The main cost driver is the number of papers scored. At Sonnet pricing, expect roughly <strong>$0.10–0.12 per 100 papers</strong>. A typical run across a full journal list (150–200 papers) costs $0.15–0.25. arXiv cs.LG and stat.ML can each add 100–300 papers per day on their own — deselecting them is the single biggest cost reduction. The &#9889; Haiku Prefilter helps further when you have many low-relevance papers to discard cheaply before Sonnet scoring. Score caching means re-running over an overlapping date window is nearly free — only papers you have not scored before incur an API call. Costs are billed directly to your Anthropic account.</p>
+
+    <h3>Tuning your profile</h3>
+    <p>Run the tool a few times and look at papers scoring 6–7: if they feel more relevant than their score suggests, add a more specific Prioritize entry. If papers you don't care about keep appearing, add them to Downgrade. The relevance reason on each card is the best diagnostic — it tells you exactly which part of your profile Claude matched (or didn't).</p>
+
+    <h3>Using New only</h3>
+    <p>After your first run, use the <span class="ui-label">New only</span> filter on subsequent days to focus on papers you haven't seen before. The seen-papers cache persists across sessions so this works even if you close and reopen the app.</p>
+
+    <h3>Clearing the cache</h3>
+    <p>The <span class="ui-label">Clear cache</span> button in the sidebar footer resets the seen-papers history, the dismissed-papers list, <em>and</em> the score cache. All papers will be marked as new and re-scored from scratch on the next run. Use this if you want a completely fresh start, if you have significantly revised your Research Profile and want fresh Sonnet scores, or if the cache has grown stale.</p>
+
+    <h3>Light / Dark theme</h3>
+    <p>The <span class="ui-label">&#9728; Light</span> / <span class="ui-label">&#127769; Dark</span> button in the sidebar footer toggles the color scheme. The preference is saved in local storage and persists across sessions. Export and Brief pages mirror the theme at the moment they are generated.</p>
+
+    <h3>The Profile collapse</h3>
+    <p>The <span class="ui-label">Profile &#9662;</span> section can be collapsed to give more vertical space to the journal list. The collapsed state is intentionally not saved — the profile reopens fresh each session so you are reminded to review your settings.</p>
+  </div>
+
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+</div>
+<script>
+function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
+<\/script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('Popup was blocked. Please allow popups for this page and try again.');
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
+// Fetch button
+document.getElementById('fetch-btn').addEventListener('click', fetchAndScore);
+
+// No default profile fields — each user should fill in their own Research Profile.
+
+</script>
+</body>
+</html>
