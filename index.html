@@ -651,6 +651,11 @@
           </div>
         </div>
         <div id="journal-list"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <label>Custom journals</label>
+          <textarea id="custom-journals-input" rows="3" placeholder="Name | S-ID or ISSN&#10;e.g. Nature Sustainability | S4210178125&#10;e.g. My Journal | 1234-5678" style="width:100%;font-size:11px;resize:vertical;min-height:54px;box-sizing:border-box"></textarea>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">One per line &middot; Find IDs at <a href="https://openalex.org" target="_blank" style="color:var(--text3)">openalex.org</a></div>
+        </div>
       </div>
 
       <div class="sidebar-section" style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
@@ -707,7 +712,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v2.75';
+const VERSION = 'v2.76';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -918,6 +923,8 @@ function loadState() {
     if (haikuThresh) document.getElementById('haiku-threshold').value = haikuThresh;
     const abstractChars = localStorage.getItem('litmonitor_abstractchars');
     if (abstractChars) document.getElementById('abstract-chars').value = abstractChars;
+    const customJournals = localStorage.getItem('litmonitor_custom_journals');
+    if (customJournals) document.getElementById('custom-journals-input').value = customJournals;
     const lastFetch = localStorage.getItem('litmonitor_last_fetch');
     const lastCount = localStorage.getItem('litmonitor_last_count');
     if (lastFetch) {
@@ -959,6 +966,7 @@ function saveSettings() {
   localStorage.setItem('litmonitor_abstractchars', document.getElementById('abstract-chars').value);
   const selected = Array.from(document.querySelectorAll('[data-journal-id]:checked')).map(cb => cb.dataset.journalId);
   localStorage.setItem('litmonitor_journals', JSON.stringify(selected));
+  localStorage.setItem('litmonitor_custom_journals', document.getElementById('custom-journals-input').value);
 }
 
 
@@ -986,11 +994,42 @@ function saveScoreCache() {
   } catch(e) {}
 }
 
+// ── CUSTOM JOURNALS ───────────────────────────────────────────────────────────
+// Parses the custom-journals-input textarea into journal objects compatible with
+// the main JOURNALS array. Accepts OpenAlex source IDs (S1234567) or ISSNs.
+// Format: one entry per line — "Display Name | S-ID-or-ISSN"
+// Lines starting with # and blank lines are silently ignored.
+function parseCustomJournals() {
+  const raw = document.getElementById('custom-journals-input').value;
+  return raw.split('\n')
+    .map(l => l.trim())
+    .filter(l => l && !l.startsWith('#'))
+    .map((line, i) => {
+      const parts = line.split('|').map(s => s.trim());
+      if (parts.length < 2) return null;
+      const name = parts[0];
+      const id   = parts[1];
+      if (!name || !id) return null;
+      const isSourceId = /^S\d+$/i.test(id);
+      return {
+        id:   `custom-${i}`,
+        name,
+        type: 'openalex',
+        ...(isSourceId
+          ? { openalexSourceId: id.toUpperCase() }
+          : { openalexIssn:    id })
+      };
+    })
+    .filter(Boolean);
+}
+
 // ── BUILD JOURNAL LIST ────────────────────────────────────────────────────────
 function updateJournalCount() {
-  const total = JOURNALS.length;
+  const total    = JOURNALS.length;
   const selected = document.querySelectorAll('[data-journal-id]:checked').length;
-  document.getElementById('journal-count').textContent = `${selected}/${total}`;
+  const custom   = parseCustomJournals().length;
+  const customStr = custom > 0 ? ` +${custom} custom` : '';
+  document.getElementById('journal-count').textContent = `${selected}/${total}${customStr}`;
 }
 
 function buildJournalList() {
@@ -1544,6 +1583,7 @@ async function fetchAndScore() {
     const cb = document.querySelector(`[data-journal-id="${j.id}"]`);
     return cb && cb.checked;
   });
+  selectedJournals.push(...parseCustomJournals());
   if (!selectedJournals.length) { showError('Please select at least one journal.'); return; }
 
   saveSettings();
@@ -1818,6 +1858,10 @@ document.getElementById('prefilter-btn').addEventListener('click', () => {
 // Save on change
 ['context-input', 'api-key-input', 'prioritize-input', 'methods-input', 'downgrade-input', 'authors-input', 'days-back', 'haiku-threshold', 'abstract-chars'].forEach(id => {
   document.getElementById(id).addEventListener('change', saveSettings);
+});
+document.getElementById('custom-journals-input').addEventListener('input', () => {
+  saveSettings();
+  updateJournalCount();
 });
 
 // Character counter for Research Context
@@ -2311,6 +2355,15 @@ function openDocs() {
         <p>While a Fetch &amp; Score run is in progress, a red <span class="ui-label">&#9632; Stop</span> button appears in the header. Clicking it sets an abort flag that halts the run after the current in-flight scoring batch completes. Papers scored up to that point are displayed normally. The status line will show <em>· stopped early</em> to indicate the run was not completed.</p>
       </div>
     </div>
+
+    <div class="field-card">
+      <div class="field-name">Custom journals</div>
+      <div class="field-body">
+        <p>A free-text box at the bottom of the journal list lets you add any OpenAlex-indexed journal not in the built-in list. Enter <strong>one journal per line</strong> using the format:</p>
+        <p style="font-family:monospace;font-size:0.85rem;margin:0.4rem 0 0.4rem 1rem">Display Name | OpenAlex-ID-or-ISSN</p>
+        <p>The identifier after the <code>|</code> can be either an OpenAlex source ID (e.g. <code>S4210178125</code>) or an ISSN (e.g. <code>2398-9629</code>). To find an ID, search for the journal at <strong>openalex.org</strong> and copy the <code>S…</code> number from the URL, or use the journal's ISSN directly. Lines starting with <code>#</code> are treated as comments and ignored. Custom journals are always fetched when present — there is no individual checkbox for them. The journal count in the sidebar header updates to show e.g. <em>18/24 +2 custom</em>. Custom entries are saved in local storage alongside all other settings.</p>
+      </div>
+    </div>
   </div>
 
   <!-- 4. PROFILE -->
@@ -2387,6 +2440,9 @@ function openDocs() {
 
     <h3>Current journal list</h3>
     <p>AI for Earth Systems (AMS) &middot; arXiv cs.LG &middot; arXiv physics.ao-ph &middot; arXiv stat.ML &middot; BAMS &middot; Earth's Future (AGU) &middot; Environmental Data Science &middot; Environmental Research: Climate &middot; Environmental Research Letters &middot; Geoscientific Model Development &middot; GRL (AGU) &middot; JAMES (AGU) &middot; JGR-Atmospheres (AGU) &middot; Machine Learning: Earth &middot; Monthly Weather Review (AMS) &middot; Nature &middot; Nature Climate Change &middot; Nature Communications &middot; npj Climate and Atmospheric Science &middot; Science (AAAS) &middot; Science Advances (AAAS) &middot; Scientific Reports (Nature)</p>
+
+    <h3>Adding custom journals</h3>
+    <p>Any OpenAlex-indexed journal can be added using the <span class="ui-label">Custom journals</span> box at the bottom of the journal list. Enter one journal per line in the format <code>Name | ID</code>, where the ID is either an OpenAlex source ID (e.g. <code>S4210178125</code>) or an ISSN (e.g. <code>2398-9629</code>). To find an ID, visit <strong>openalex.org</strong>, search for the journal, and copy the <code>S…</code> number from the URL. See <a href="#settings">Section 3</a> for full details.</p>
   </div>
 
   <!-- 7. FETCH & SCORE -->

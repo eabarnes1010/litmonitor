@@ -71,6 +71,23 @@ Most of the relevance signal is in the first few hundred characters of an abstra
 
 While a Fetch & Score run is in progress, a red **■ Stop** button appears in the header. Clicking it sets an abort flag that halts the run after the current in-flight scoring batch completes. Papers scored up to that point are displayed normally. The status line will show *· stopped early* to indicate the run was not completed.
 
+### Custom journals
+
+A free-text box at the bottom of the journal list lets you add any OpenAlex-indexed journal not in the built-in list. Enter **one journal per line** using the format:
+
+```
+Display Name | OpenAlex-ID-or-ISSN
+```
+
+The identifier after the `|` can be either an OpenAlex source ID (e.g. `S4210178125`) or an ISSN (e.g. `2398-9629`). To find an ID, search for the journal at **openalex.org** and copy the `S…` number from the URL. Lines starting with `#` are treated as comments and ignored. Custom journals are always fetched when present — there is no individual checkbox for them. The journal count updates to show e.g. *18/24 +2 custom*.
+
+Example:
+```
+Nature Sustainability | S4210178125
+# My other journal
+Journal of Geophysical Research: Oceans | 2169-9291
+```
+
 ---
 
 ## 4. Research Profile
@@ -141,6 +158,10 @@ Use the **All** and **None** buttons to quickly select or deselect all sources. 
 ### Current journal list
 
 AI for Earth Systems (AMS) · arXiv cs.LG · arXiv physics.ao-ph · arXiv stat.ML · BAMS · Earth's Future (AGU) · Environmental Data Science · Environmental Research: Climate · Environmental Research Letters · Geoscientific Model Development · GRL (AGU) · JAMES (AGU) · JGR-Atmospheres (AGU) · Machine Learning: Earth · Monthly Weather Review (AMS) · Nature · Nature Climate Change · Nature Communications · npj Climate and Atmospheric Science · Science (AAAS) · Science Advances (AAAS) · Scientific Reports (Nature)
+
+### Adding custom journals
+
+Any OpenAlex-indexed journal can be added using the **Custom journals** box at the bottom of the journal list. See the [Custom journals](#custom-journals) section under Fetch Settings for full details on the format.
 
 ---
 
