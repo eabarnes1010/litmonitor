@@ -142,6 +142,18 @@
     position: sticky;
     top: 57px;
   }
+  #sidebar-resizer {
+    width: 5px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 10;
+  }
+  #sidebar-resizer:hover, #sidebar-resizer.dragging {
+    background: var(--accent);
+    opacity: 0.25;
+  }
   /* When profile is expanded, release height constraint so content isn't clipped */
   #sidebar.profile-open {
     position: relative;
@@ -665,6 +677,7 @@
       </div>
 
     </aside>
+    <div id="sidebar-resizer"></div>
 
     <!-- Main feed -->
     <section id="feed-area">
@@ -1863,6 +1876,42 @@ document.getElementById('custom-journals-input').addEventListener('input', () =>
   saveSettings();
   updateJournalCount();
 });
+
+// ── SIDEBAR RESIZE ────────────────────────────────────────────────────────────
+(function() {
+  const sidebar  = document.getElementById('sidebar');
+  const resizer  = document.getElementById('sidebar-resizer');
+  const MIN_W = 200, MAX_W = 600;
+
+  // Restore saved width
+  const saved = localStorage.getItem('litmonitor_sidebar_width');
+  if (saved) {
+    const w = parseInt(saved);
+    sidebar.style.width    = w + 'px';
+    sidebar.style.minWidth = w + 'px';
+  }
+
+  resizer.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX     = e.clientX;
+    const startWidth = sidebar.offsetWidth;
+    resizer.classList.add('dragging');
+
+    function onMove(e) {
+      const w = Math.max(MIN_W, Math.min(MAX_W, startWidth + e.clientX - startX));
+      sidebar.style.width    = w + 'px';
+      sidebar.style.minWidth = w + 'px';
+    }
+    function onUp() {
+      resizer.classList.remove('dragging');
+      localStorage.setItem('litmonitor_sidebar_width', sidebar.offsetWidth);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+})();
 
 // Character counter for Research Context
 (function() {
