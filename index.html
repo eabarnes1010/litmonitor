@@ -725,7 +725,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v2.76';
+const VERSION = 'v2.78';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -1509,6 +1509,20 @@ function renderPapers() {
       ? `<a href="${p.link}" target="_blank" rel="noopener">${p.title}</a>`
       : p.title;
 
+    const cDate = p.date ? (p.date instanceof Date ? p.date : new Date(p.date)) : null;
+    const cYear = cDate && !isNaN(cDate) ? cDate.getFullYear() : '';
+    const cAuth = p.authors
+      ? p.authors.split(',').slice(0, 3).join(', ') + (p.authors.split(',').length > 3 ? ' et al.' : '')
+      : '';
+    const cParts = [
+      cAuth ? `${cAuth}.` : '',
+      cYear ? `${cYear}.` : '',
+      p.title ? `"${p.title}."` : '',
+      p.journal ? `${p.journal}.` : '',
+      p.link || ''
+    ].filter(Boolean);
+    const cardCitation = escHtml(cParts.join(' '));
+
     card.innerHTML = `
       <div class="card-top">
         <div class="score-badge ${scoreClass(p.score)}">${p.score}</div>
@@ -1527,6 +1541,7 @@ function renderPapers() {
       <div class="card-actions">
         ${p.link ? `<a href="${p.link}" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none;font-size:10px;padding:4px 10px;">Open →</a>` : ''}
         <button class="btn btn-ghost abstract-btn">Abstract</button>
+        <button class="btn btn-ghost copy-cite-btn" data-citation="${cardCitation}">Copy citation</button>
         <button class="btn btn-ghost dismiss-btn" data-id="${p.id}">Dismiss</button>
       </div>
     `;
@@ -1557,6 +1572,15 @@ function renderPapers() {
         card.classList.add('dismissed');
         setTimeout(() => { card.remove(); renderPapers(); }, 400);
       }
+    });
+  });
+
+  container.querySelectorAll('.copy-cite-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.citation).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy citation'; }, 1500);
+      });
     });
   });
 }
@@ -1680,6 +1704,10 @@ async function fetchAndScore() {
     allPapers = allPapers.slice(0, MAX_PAPERS_TOTAL);
   }
 
+  // Filter out previously dismissed papers — no point scoring or displaying them
+  const dismissedCount = allPapers.filter(p => dismissed.has(p.id)).length;
+  allPapers = allPapers.filter(p => !dismissed.has(p.id));
+
   // Abstract enrichment: fill gaps left by publisher copyright restrictions
   // using Semantic Scholar, which has broader abstract agreements.
   // Mutates allPapers in-place; benefits both scoring and brief generation.
@@ -1787,11 +1815,12 @@ async function fetchAndScore() {
   const now = new Date();
   localStorage.setItem('litmonitor_last_fetch', now.toISOString());
   localStorage.setItem('litmonitor_last_count', scored.length);
-  const cacheNote = cachedResults.length ? ` · ${cachedResults.length} from cache` : '';
-  const stoppedNote = abortRequested ? ' · stopped early' : '';
+  const cacheNote     = cachedResults.length ? ` · ${cachedResults.length} from cache` : '';
+  const stoppedNote   = abortRequested ? ' · stopped early' : '';
+  const dismissedNote = dismissedCount > 0 ? ` · ${dismissedCount} dismissed skipped` : '';
   document.getElementById('status-line').textContent = haikusPrefilter && uncachedPapers.length > 0
-    ? `last run: ${now.toLocaleTimeString()} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku ⚡${cacheNote}${stoppedNote}`
-    : `last run: ${now.toLocaleTimeString()} · ${scored.length} papers scored${cacheNote}${stoppedNote}`;
+    ? `last run: ${now.toLocaleTimeString()} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku ⚡${cacheNote}${dismissedNote}${stoppedNote}`
+    : `last run: ${now.toLocaleTimeString()} · ${scored.length} papers scored${cacheNote}${dismissedNote}${stoppedNote}`;
 
   renderPapers();
 }
