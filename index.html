@@ -725,7 +725,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v2.78';
+const VERSION = 'v2.79';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -1818,9 +1818,10 @@ async function fetchAndScore() {
   const cacheNote     = cachedResults.length ? ` · ${cachedResults.length} from cache` : '';
   const stoppedNote   = abortRequested ? ' · stopped early' : '';
   const dismissedNote = dismissedCount > 0 ? ` · ${dismissedCount} dismissed skipped` : '';
+  const runDateTime = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
   document.getElementById('status-line').textContent = haikusPrefilter && uncachedPapers.length > 0
-    ? `last run: ${now.toLocaleTimeString()} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku ⚡${cacheNote}${dismissedNote}${stoppedNote}`
-    : `last run: ${now.toLocaleTimeString()} · ${scored.length} papers scored${cacheNote}${dismissedNote}${stoppedNote}`;
+    ? `last run: ${runDateTime} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku ⚡${cacheNote}${dismissedNote}${stoppedNote}`
+    : `last run: ${runDateTime} · ${scored.length} papers scored${cacheNote}${dismissedNote}${stoppedNote}`;
 
   renderPapers();
 }
