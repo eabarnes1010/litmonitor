@@ -1403,7 +1403,7 @@ function exportVisible() {
   <div class="card-meta">${escHtml(p.journal)}${mo ? ' &middot; ' + escHtml(mo) : ''}${auth ? ' &middot; ' + escHtml(auth) : ''}</div>
   ${p.reason   ? `<div class="card-reason">${escHtml(p.reason)}</div>` : ''}
   <details><summary>Abstract</summary><p class="abstract">${p.abstract ? escHtml(p.abstract) : '<em>No abstract available.</em>'}</p></details>
-  <div class="card-actions"><button class="copy-cite-btn" data-citation="${citation}">Copy citation</button></div>
+  <div class="card-actions"><button class="copy-cite-btn" data-citation="${citation}">Citation</button></div>
 </div>`;
   }).join('\n');
 
@@ -1457,7 +1457,7 @@ function exportVisible() {
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
-document.querySelectorAll('.copy-cite-btn').forEach(function(btn){btn.addEventListener('click',function(){var txt=btn.dataset.citation;navigator.clipboard.writeText(txt).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Copy citation';btn.classList.remove('copied');},1500);});});});
+document.querySelectorAll('.copy-cite-btn').forEach(function(btn){btn.addEventListener('click',function(){var txt=btn.dataset.citation;navigator.clipboard.writeText(txt).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Citation';btn.classList.remove('copied');},1500);});});});
 <\/script>
 </body>
 </html>`;
@@ -1541,7 +1541,7 @@ function renderPapers() {
       <div class="card-actions">
         ${p.link ? `<a href="${p.link}" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none;font-size:10px;padding:4px 10px;">Open →</a>` : ''}
         <button class="btn btn-ghost abstract-btn">Abstract</button>
-        <button class="btn btn-ghost copy-cite-btn" data-citation="${cardCitation}">Copy citation</button>
+        <button class="btn btn-ghost copy-cite-btn" data-citation="${cardCitation}">Citation</button>
         <button class="btn btn-ghost dismiss-btn" data-id="${p.id}">Dismiss</button>
       </div>
     `;
@@ -1579,7 +1579,7 @@ function renderPapers() {
     btn.addEventListener('click', () => {
       navigator.clipboard.writeText(btn.dataset.citation).then(() => {
         btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy citation'; }, 1500);
+        setTimeout(() => { btn.textContent = 'Citation'; }, 1500);
       });
     });
   });
@@ -2175,7 +2175,7 @@ ${paperList}`;
   <div class="card-meta">${escHtml(p.journal)}${mo ? ' &middot; ' + escHtml(mo) : ''}${auth ? ' &middot; ' + escHtml(auth) : ''}</div>
   <div class="card-brief">${briefHtml}</div>
   ${!noAbstractIds.has(p.id) ? `<details><summary>Abstract</summary><p class="abstract">${escHtml(p.abstract)}</p></details>` : ''}
-  <div class="card-actions"><button class="copy-cite-btn" data-citation="${citation}">Copy citation</button></div>
+  <div class="card-actions"><button class="copy-cite-btn" data-citation="${citation}">Citation</button></div>
 </div>`;
     }).join('\n');
 
@@ -2235,7 +2235,7 @@ ${paperList}`;
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
-document.querySelectorAll('.copy-cite-btn').forEach(function(btn){btn.addEventListener('click',function(){var txt=btn.dataset.citation;navigator.clipboard.writeText(txt).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Copy citation';btn.classList.remove('copied');},1500);});});});
+document.querySelectorAll('.copy-cite-btn').forEach(function(btn){btn.addEventListener('click',function(){var txt=btn.dataset.citation;navigator.clipboard.writeText(txt).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Citation';btn.classList.remove('copied');},1500);});});});
 <\/script>
 </body>
 </html>`;
