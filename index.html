@@ -1388,9 +1388,9 @@ function exportVisible() {
       : escHtml(p.title);
     const year = date && !isNaN(date) ? date.getFullYear() : '';
     const citeParts = [
-      auth || '',
-      year ? `(${year}).` : '',
-      p.title ? `${p.title}.` : '',
+      auth ? `${auth}.` : '',
+      year ? `${year}.` : '',
+      p.title ? `"${p.title}."` : '',
       p.journal ? `${p.journal}.` : '',
       p.link || ''
     ].filter(Boolean);
@@ -2115,9 +2115,9 @@ ${paperList}`;
         : '';
       const year = date && !isNaN(date) ? date.getFullYear() : '';
       const citeParts = [
-        auth || '',
-        year ? `(${year}).` : '',
-        p.title ? `${p.title}.` : '',
+        auth ? `${auth}.` : '',
+        year ? `${year}.` : '',
+        p.title ? `"${p.title}."` : '',
         p.journal ? `${p.journal}.` : '',
         p.link || ''
       ].filter(Boolean);
