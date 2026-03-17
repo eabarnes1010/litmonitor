@@ -1984,8 +1984,8 @@ document.getElementById('brief-btn').addEventListener('click', async () => {
   const visible = getVisiblePapers();  // honours current filter, min-score, and search
   if (!visible.length) { alert('No papers are currently shown — nothing to brief.'); return; }
 
-  // Cap at 20 papers to keep token usage reasonable
-  const MAX_PAPERS = 20;
+  // Cap at 50 papers to keep token usage reasonable
+  const MAX_PAPERS = 50;
   const allCapped = visible.slice(0, MAX_PAPERS);
   const omitted   = visible.length - allCapped.length;
 
