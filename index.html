@@ -465,6 +465,31 @@
   .card-actions .btn { font-size: 10px; padding: 4px 10px; }
   .dismiss-btn { color: var(--text3); }
   .dismiss-btn:hover { border-color: var(--red); color: var(--red); }
+  .blurb-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+  .card-blurb {
+    display: none;
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.6;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--blue);
+    border-radius: var(--radius);
+    background: var(--bg3);
+    position: relative;
+  }
+  .card-blurb.open { display: block; }
+  .card-blurb .blurb-text { font-style: italic; }
+  .card-blurb .blurb-hint {
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
 
   .card-abstract {
     display: none;
@@ -725,7 +750,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v2.79';
+const VERSION = 'v2.80';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -1542,8 +1567,10 @@ function renderPapers() {
         ${p.link ? `<a href="${p.link}" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none;font-size:10px;padding:4px 10px;">Open →</a>` : ''}
         <button class="btn btn-ghost abstract-btn">Abstract</button>
         <button class="btn btn-ghost copy-cite-btn" data-citation="${cardCitation}">Citation</button>
+        <button class="btn btn-ghost blurb-btn" data-id="${p.id}">Blurb</button>
         <button class="btn btn-ghost dismiss-btn" data-id="${p.id}">Dismiss</button>
       </div>
+      <div class="card-blurb"></div>
     `;
 
     container.appendChild(card);
@@ -1583,6 +1610,104 @@ function renderPapers() {
       });
     });
   });
+
+  // Blurb handlers — generate a one-sentence, Slack-ready blurb on demand.
+  container.querySelectorAll('.blurb-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const apiKey = document.getElementById('api-key-input').value.trim();
+      if (!apiKey) { alert('Please enter your API key first.'); return; }
+
+      const id = btn.dataset.id;
+      const p  = papers.find(x => x.id === id);
+      if (!p) return;
+
+      const card    = btn.closest('.paper-card');
+      const blurbEl = card.querySelector('.card-blurb');
+
+      // Already generated — just toggle visibility, re-copying when shown.
+      if (blurbEl.dataset.text) {
+        const open = blurbEl.classList.toggle('open');
+        btn.textContent = open ? 'Hide blurb' : 'Blurb';
+        if (open) navigator.clipboard.writeText(blurbEl.dataset.share).catch(() => {});
+        return;
+      }
+
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+      try {
+        const blurb = await generateBlurb(p, apiKey);
+        renderBlurb(blurbEl, blurb, p);
+        blurbEl.classList.add('open');
+        btn.textContent = 'Hide blurb';
+        // Auto-copy so it's ready to paste into Slack.
+        navigator.clipboard.writeText(blurbEl.dataset.share).catch(() => {});
+      } catch(e) {
+        blurbEl.innerHTML = `<span style="color:var(--red)">Blurb error: ${escHtml(e.message)}</span>`;
+        blurbEl.classList.add('open');
+        btn.textContent = orig;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+// Generate a single short, shareable blurb for one paper.
+async function generateBlurb(p, apiKey) {
+  const context    = document.getElementById('context-input').value.trim();
+  const prioritize = document.getElementById('prioritize-input').value.trim();
+  const methods    = document.getElementById('methods-input').value.trim();
+  const profileBlock = [
+    context    ? `Who I am: ${context}`                    : '',
+    prioritize ? `I prioritize: ${prioritize}`             : '',
+    methods    ? `Methods I find transferable: ${methods}` : '',
+  ].filter(Boolean).join('\n');
+
+  const systemPrompt = `You flag interesting research papers for a team chat. Write one casual sentence — the kind you'd dash off to a colleague — capturing the single key idea that makes the paper worth a look. Focus on the paper itself; only nod to the researcher's area (from the profile) if it's genuinely a natural fit, and keep that nod light — never force it or make it sound like a sales pitch. HARD RULES: exactly one sentence, 25 words or fewer; casual and punchy, not academic; no emoji, no hashtags; NEVER use "you" or "your"; do not begin with "This paper" or "The authors"; output just the sentence, nothing else.`;
+
+  const userPrompt = `RESEARCHER PROFILE:
+${profileBlock || '(not provided)'}
+
+PAPER
+TITLE: ${p.title}
+${p.journal ? `JOURNAL: ${p.journal}\n` : ''}ABSTRACT: ${p.abstract && p.abstract.trim() ? p.abstract : '(no abstract available — base the blurb on the title)'}
+
+Write the one-sentence blurb.`;
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 150,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API error ${resp.status}`);
+  }
+  const data = await resp.json();
+  const text = (data.content.find(c => c.type === 'text')?.text || '').trim();
+  if (!text) throw new Error('Empty response.');
+  return text;
+}
+
+// Render the blurb text into the blurb element. The text is auto-copied by the caller.
+function renderBlurb(blurbEl, blurb, p) {
+  blurbEl.dataset.text  = blurb;
+  blurbEl.dataset.share = p.link ? `${blurb} ${p.link}` : blurb;
+  blurbEl.innerHTML = `
+    <div class="blurb-text">${escHtml(blurb)}</div>
+    <div class="blurb-hint">Copied to clipboard ✓</div>`;
 }
 
 // ── PROGRESS / ERROR UI ────────────────────────────────────────────────────────
@@ -1965,7 +2090,7 @@ document.getElementById('custom-journals-input').addEventListener('input', () =>
   const updateContextCount = () => {
     const n = contextEl.value.length;
     countEl.textContent = n;
-    countEl.style.color = n > 140 ? 'var(--amber, #f59e0b)' : '';
+    countEl.style.color = n >= 160 ? 'var(--red)' : '';
   };
   contextEl.addEventListener('input', updateContextCount);
   updateContextCount(); // initialise on load
