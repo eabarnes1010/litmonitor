@@ -121,7 +121,8 @@ To spend less, in order of effect: put terms in the arXiv.cs filter, leave the H
 
 - **Clear cache** resets seen papers, dismissals and cached scores. Starred papers are kept.
 - **New only** works across sessions; the history persists in your browser.
-- arXiv is reached through free public relays. When they are down the app falls back to one that returns **only the ten newest** papers per feed and says so in the error area; those days are requested again on your next run.
+- arXiv is reached through free public relays. When they are down the app falls back to one that returns **only the ten newest** papers per feed and says so above the cards; those days are requested again on your next run.
+- Messages above the cards can be dismissed with the **×** at their right. A run that still has something to report says so again.
 - Papers found in more than one source are merged, preprint with published version, keeping whichever abstract exists.
 - The app is one HTML file, so you can save a copy and keep it.
 

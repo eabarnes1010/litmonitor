@@ -959,7 +959,9 @@
     border-right: 1px solid var(--border);
     padding-right: 22px;
   }
-  .card-body { min-width: 0; max-width: 78ch; }
+  /* No measure cap: the card fills the feed, which is what a wide window is
+     for. The feed's own padding is the only thing holding it off the edge. */
+  .card-body { min-width: 0; }
 
   /* A high score is filled rather than tinted, so the papers worth reading are
      findable by colour alone while scrolling. */
@@ -1241,11 +1243,28 @@
   }
 
   .error-msg, .notice-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
     padding: 11px 14px;
     border-radius: var(--radius-sm);
     font-size: 12.5px;
     margin-bottom: 12px;
   }
+  /* The report is worth reading once; after that it is in the way, and a run
+     that still applies says so again. */
+  .msg-text { flex: 1; min-width: 0; white-space: pre-line; }
+  .msg-close {
+    flex: 0 0 auto;
+    width: 20px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: none; border-radius: var(--radius-sm);
+    color: inherit; opacity: 0.55;
+    font: inherit; font-size: 15px; line-height: 1;
+    cursor: pointer; padding: 0;
+  }
+  .msg-close:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); }
+  .msg-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .error-msg {
     background: color-mix(in srgb, var(--red) 8%, transparent);
     border: 1px solid color-mix(in srgb, var(--red) 25%, transparent);
@@ -1325,7 +1344,6 @@
       padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
     }
-    .card-body { max-width: none; }
   }
 
   /* Narrow screens stack the shell. The sidebar used to be hidden outright,
@@ -1654,7 +1672,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.2';
+const VERSION = 'v3.3';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -2740,17 +2758,53 @@ function normalizeArxivLink(link) {
 }
 
 // ── FETCH VIA PROXY (arXiv only) ─────────────────────────────────────────────
+// A run makes about a dozen relay calls in a few seconds — a feed and a window
+// for each arXiv category — and the free relays rate-limit per IP. Trying the
+// same dead relay first on every one of those calls is what turned one 429 into
+// a run with no arXiv papers, so the pool keeps two pieces of state for the
+// session: which relay last worked, and which are resting after a failure.
+const PROXY_REST_MS = 90000;
+const proxyRestingUntil = CORS_PROXIES.map(() => 0);
+let preferredProxy = 0;
+
+// Order for this attempt: the one that last worked, then the rest, with anything
+// still resting pushed to the back rather than dropped — a pool of three that
+// has all three resting must still try something.
+function proxyOrder(now) {
+  const idx = CORS_PROXIES.map((_, i) => i);
+  idx.sort((a, b) => {
+    const restA = proxyRestingUntil[a] > now, restB = proxyRestingUntil[b] > now;
+    if (restA !== restB) return restA ? 1 : -1;
+    if (a === preferredProxy) return -1;
+    if (b === preferredProxy) return 1;
+    return a - b;
+  });
+  return idx;
+}
+
 async function fetchWithProxy(url) {
-  for (const makeProxy of CORS_PROXIES) {
+  // Every relay call is spaced, not only the paged ones: arXiv asks for three
+  // seconds between requests and the relays have limits of their own.
+  await arxivSlot();
+  const now = Date.now();
+  for (const i of proxyOrder(now)) {
     try {
-      const resp = await fetch(makeProxy(url), { signal: AbortSignal.timeout(PROXY_TIMEOUT_MS) });
+      const resp = await fetch(CORS_PROXIES[i](url), { signal: AbortSignal.timeout(PROXY_TIMEOUT_MS) });
       if (resp.ok) {
         const text = await resp.text();
-        if (text && text.length > 100) return text;
+        if (text && text.length > 100) {
+          preferredProxy = i;
+          proxyRestingUntil[i] = 0;
+          return text;
+        }
       }
-    } catch(e) {}
+      // 429 is the one worth resting on: it means "not you again, yet".
+      proxyRestingUntil[i] = Date.now() + (resp.status === 429 ? PROXY_REST_MS : PROXY_REST_MS / 3);
+    } catch(e) {
+      proxyRestingUntil[i] = Date.now() + PROXY_REST_MS / 3;
+    }
   }
-  throw new Error(`All proxies failed for ${url}`);
+  throw new Error('every relay refused this request');
 }
 
 // ── LAST-RESORT RELAY: rss2json ──────────────────────────────────────────────
@@ -2838,6 +2892,9 @@ function arxivApiUrl(cat, cutoff, now, start) {
 // what produced this release's OpenAlex 429s. Probing arXiv without it earned a
 // 429 and then a 503 within a few minutes.
 const ARXIV_MIN_GAP_MS = 3000;
+// How far arXiv's submittedDate index trails the announcement, measured
+// 2026-08-24: cs.LG returned 0 papers for a 2-day window, 43 for 3, 148 for 4.
+const ARXIV_INDEX_LAG_DAYS = 3;
 let arxivNextSlot = 0;
 
 async function arxivSlot() {
@@ -2862,7 +2919,6 @@ async function fetchArxivApi(cat, journalName, cutoff, now) {
   const out = [];
   let total = null;
   for (let page = 0; page < ARXIV_API_PAGES; page++) {
-    await arxivSlot();
     const xml = await fetchWithProxy(arxivApiUrl(cat, cutoff, now, page * ARXIV_API_MAX));
     if (!looksLikeArxivFeed(xml)) throw new Error('relay returned something that is not an arXiv feed');
     if (total === null) {
@@ -2909,32 +2965,39 @@ async function fetchArxivBoth(j, cat, cutoff, fetchErrors, partialNotes) {
       const json = await fetchArxivViaJson(j.rss, j.name, cutoff);
       add(json.papers);
       if (json.truncated) {
-        partialNotes.push(`${j.name}: the usual relays are down and the fallback returns only `
-          + `${json.items} items per feed — the rest are requested again next run`);
+        partialNotes.push({ source: j.name,
+          reason: `the relays are down and the fallback serves only ${json.items} items per feed` });
       }
     } catch(jsonErr) {
-      failures.push(`today's announcement (${feedErr.message})`);
+      failures.push("today's announcement could not be fetched");
     }
   }
 
   // The window by submission date, which is where a missed day comes back from.
-  if (cat) {
+  // arXiv's submittedDate index runs two to three days behind, so a window that
+  // only reaches back that far cannot contain anything the feed did not already
+  // give us — asking is a wasted relay call, and relay calls are the scarce
+  // thing. A wider window is exactly the catching-up case, so it still asks.
+  const windowDays = (Date.now() - cutoff.getTime()) / 86400000;
+  if (cat && windowDays > ARXIV_INDEX_LAG_DAYS) {
     try {
       const api = await fetchArxivApi(cat, j.name, cutoff, new Date());
       add(api.papers);
       if (api.capped) {
-        partialNotes.push(`${j.name}: ${api.total} papers in that window, more than the `
-          + `${ARXIV_API_PAGES * ARXIV_API_MAX} a run fetches — the oldest are requested again next run`);
+        partialNotes.push({ source: j.name,
+          reason: `more papers in that window than a run fetches (${api.total} against ${ARXIV_API_PAGES * ARXIV_API_MAX})` });
       }
     } catch(apiErr) {
-      failures.push(`the ${cat} window (${apiErr.message})`);
+      failures.push('the date window could not be fetched');
     }
   }
 
   // Only a source that produced nothing at all is a failure; one half answering
   // is a partial, because the other half's days are still missing.
   if (!byId.size) throw new Error(failures.join('; ') || 'nothing returned');
-  if (failures.length) partialNotes.push(`${j.name}: ${failures.join('; ')} — requested again next run`);
+  // The relay's own message names the URL, which is diagnostic noise on screen;
+  // what a reader needs is which half of the fetch did not answer.
+  if (failures.length) partialNotes.push({ source: j.name, reason: failures.join('; ') });
   return [...byId.values()];
 }
 
@@ -4203,7 +4266,17 @@ function addMessage(msg, cls, glyph) {
   const area = document.getElementById('error-area');
   const div = document.createElement('div');
   div.className = cls;
-  div.textContent = `${glyph} ${msg}`;
+  const text = document.createElement('span');
+  text.className = 'msg-text';
+  text.textContent = `${glyph} ${msg}`;
+  const close = document.createElement('button');
+  close.className = 'msg-close';
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Dismiss this message');
+  close.dataset.tip = 'Dismiss. The next run reports again if it still applies.';
+  close.innerHTML = '&times;';
+  close.addEventListener('click', () => div.remove());
+  div.append(text, close);
   area.appendChild(div);
 }
 
@@ -4364,7 +4437,16 @@ async function runFetchAndScore() {
   // window, so it is reported separately and never subtracted from the count of
   // sources that worked.
   if (partialNotes.length) {
-    showNotice(`Fetched, but not in full: ${partialNotes.join(' | ')}.`);
+    // One line per reason, not per source: four feeds failing the same way used
+    // to print the same sentence four times, and twice each when both halves of
+    // the fetch missed.
+    const byReason = new Map();
+    partialNotes.forEach(n => {
+      if (!byReason.has(n.reason)) byReason.set(n.reason, []);
+      if (!byReason.get(n.reason).includes(n.source)) byReason.get(n.reason).push(n.source);
+    });
+    const lines = [...byReason].map(([reason, sources]) => `${sources.join(', ')} — ${reason}`);
+    showNotice(`Fetched, but not in full. Those days are asked for again next run.\n${lines.join('\n')}`);
   }
 
   if (allPapers.length === 0) {
@@ -5737,6 +5819,9 @@ ${pageIcon()}
 
     <h3>The left rail</h3>
     <p>From the top: <span class="ui-label">${railIcon('brief-btn')}Research Brief</span> and <span class="ui-label">${railIcon('export-btn')}Export</span>, which act on the papers currently shown and say how many in their hover text. At the foot: <span class="ui-label">${railIcon('profile-btn')}Research profile</span>, the theme control, and <span class="ui-label">${railIcon('docs-btn')}Documentation</span>. Hovering any of them names it.</p>
+    <h3>Messages</h3>
+    <p>Warnings and notices appear above the cards. Each carries a <strong>&times;</strong> that dismisses it; a later run reports again if it still applies.</p>
+
     <h3>Stats bar</h3>
     <p>Above the paper cards, a stats bar shows: <strong>Fetched</strong> (total papers scored this run), <strong>Shown</strong> (papers passing the current min-score and filter), <strong>New</strong> (papers not seen in any previous run), and <strong>Score&#8805;8</strong> (high-relevance count).</p>
 
