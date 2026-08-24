@@ -25,7 +25,7 @@ Expect roughly **$0.10–0.12 per 100 papers**.
 
 ## The interface
 
-**Left rail**, top to bottom: **Brief** and **Export**; at the foot, **Research profile**, the theme control, **Documentation** and **Back up & restore**. Hover any of them for its name. The sidebar hides from a button on its own edge, not from the rail.
+**Left rail**, top to bottom: **Fetch & Score**, **Brief** and **Export**; at the foot, **Research profile**, the theme control, **Documentation** and **Back up & restore**. The rail's **Fetch & Score** spins and turns red while a run is going, and a click on it stops the run — so starting, stopping and watching a run all survive the sidebar being closed. Hover any of them for its name. The sidebar hides from a button on its own edge, not from the rail.
 
 **Sidebar**: everything that changes the next run — fetch settings, journals, custom sources, API key — with **Cost estimate** and **Clear cache** at the bottom. Its top section does not scroll, so **Fetch & Score** and the status line stay in reach.
 
@@ -66,7 +66,7 @@ Editing any field re-scores every paper on the next run — the cache is keyed t
 | Setting | Default | Notes |
 | --- | --- | --- |
 | **Fetch days back** | 2 | A slider over 1–30 days with **Auto** at its left stop, or type any window up to 99 into the box. **Auto** asks each source for everything since *that source* was last fetched in full, so a feed that has been failing for a fortnight is caught up on the next run that works while the sources that were fine keep the recent window. Coverage is recorded per source and only when the source answered without error, without a partial, and without being trimmed by the 1,000-paper cap. Journals are asked what OpenAlex has *added* since that mark rather than what was published, because OpenAlex indexes a paper days to weeks after its publication date; arXiv is asked by submission date with a four-day overlap. Catching up costs no extra tokens — papers already scored under the current profile are cache hits. A typed number stays a literal window. |
-| **Haiku prefilter** | On | A cheap Haiku pass drops the clear misses before Sonnet scores anything. The main cost saving. |
+| **Haiku prefilter** | On | A cheap Haiku pass drops the clear misses before Sonnet sees them. The main cost saving. |
 | **Drop if Haiku scores ≤** | 5 | Higher saves more and risks losing borderline papers. |
 | **Abstract chars** | All | How much of each abstract is sent for scoring: 500, 1000, 1500, 2000, 2500 or **All**. Lower it if a run costs more than you expect. |
 
@@ -107,7 +107,7 @@ The **abstract** sits under the authors, four lines deep. It starts at the paper
 | **+ More like this** | Records it as a *learned example*. |
 | **Dismiss** | Hides it and keeps it out of future runs. |
 
-The title is the link to the paper.
+Clicking anywhere on a card opens the paper — the score, the journal, the date, the title, the authors, the score reasoning, and the space between them. The abstract and the row of buttons are the two exceptions, because a click there already means something else.
 
 **Learned examples** go to Claude as calibration for what an 8–10 looks like in your field, which is often quicker than describing it in *Prioritize*. The list is at the foot of the profile panel: the newest 20 are sent by default (slider, 0–30), up to 100 are stored, and what the list shows is exactly what is sent. Adding or removing one re-scores on the next run.
 
@@ -133,7 +133,8 @@ To spend less, in order of effect: put terms in the arXiv.cs filter, leave the H
 
 ## Odds and ends
 
-- **Clear cache** resets seen papers, dismissals, cached scores, and the record of which arXiv days have been fetched. Starred papers are kept.
+- **Messages** come in two colours. Red is a failure — storage full, a run that died, a backup file that could not be read — and always needs you. Amber is a notice: nothing is broken, and it is either an empty state or a report on the run. The three notices a run writes about itself (a source that did not answer, a source that answered for part of its window, the paper cap) carry a **Don't show again** button that silences that kind for good, whichever source it is about next time. That is safe because a source that failed or came back partial keeps its old coverage mark, so its window is asked for again on the next run whether or not the run says so.
+- **Clear cache** resets seen papers, dismissals, cached scores, silenced notices, and the record of which arXiv days have been fetched. Starred papers are kept.
 - **New only** works across sessions; the history persists in your browser.
 - arXiv is reached through free public relays. When they are down the app falls back to one that returns **only the ten newest** papers per feed and says so above the cards; those days are requested again on your next run.
 - Messages above the cards can be dismissed with the **×** at their right. A run that still has something to report says so again.

@@ -145,6 +145,11 @@
   .rail-btn:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
   .rail-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .rail-btn:disabled { cursor: not-allowed; }
+  /* Every other rail button is inert while it works. This one is the Stop
+     control as well as the progress indicator, so it stays clickable and
+     says so with the cursor. */
+  #run-btn.busy { cursor: pointer; color: var(--red); }
+  #run-btn.busy::before { border-top-color: var(--red); }
   /* Busy swaps the icon for a spinner without touching the button's children. */
   .rail-btn.busy { color: var(--accent); cursor: progress; }
   .rail-btn.busy > svg { visibility: hidden; }
@@ -1073,6 +1078,11 @@
     border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent);
   }
 
+  /* The whole card opens the paper, so it says so. Only a card that has a link
+     gets the cursor — a paper with no resolvable URL is not clickable. */
+  .paper-card.linked { cursor: pointer; }
+  .paper-card.linked .card-abstract,
+  .paper-card.linked .card-actions { cursor: auto; }
   .paper-authors {
     font-size: 12.5px;
     color: var(--text3);
@@ -1292,6 +1302,17 @@
     font: inherit; font-size: 15px; line-height: 1;
     cursor: pointer; padding: 0;
   }
+  /* Quieter than the message and quieter than the ×: it is an option, not a
+     thing to do. Sized off the message so it cannot outweigh the text. */
+  .msg-mute {
+    flex: 0 0 auto;
+    background: none; border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-radius: var(--radius-sm); color: inherit; opacity: 0.75;
+    font: inherit; font-size: 11px; line-height: 1.4;
+    padding: 2px 8px; cursor: pointer; white-space: nowrap;
+  }
+  .msg-mute:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); }
+  .msg-mute:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .msg-close:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); }
   .msg-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .error-msg {
@@ -1418,12 +1439,17 @@
 <body>
 <div id="app">
 
-  <!-- Icon rail: the two feed-wide actions above, the two app-level ones below.
+  <!-- Icon rail: the feed-wide actions above, the app-level ones below.
        Clear cache is deliberately not here — it is destructive, and an
        unlabelled icon is the wrong affordance for wiping the score cache. -->
   <div id="rail" aria-label="Actions">
     <div class="rail-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--accent)"/><path d="M9 24.5c2.6-4.4 3.6-10.6 6.4-14.2 2.7-3.5 6.3-5.2 10.6-5.3-.3 6.3-3.6 11.2-8.1 13.2-2.9 1.3-6 3.4-8.9 6.3z" fill="var(--on-accent)"/><path d="M24.4 6 10 23.6" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round" fill="none"/><path d="M8 27.4h16" stroke="var(--on-accent)" stroke-width="2" stroke-linecap="round" fill="none"/></svg></div>
     <div class="rail-sep"></div>
+    <!-- Fetch is the action that makes the feed the two below it act on, so it
+         sits above them. It is on the rail rather than only in the sidebar
+         because the sidebar closes, and with it went the only way to start a
+         run, the only way to stop one, and the only sign that one was going. -->
+    <button class="rail-btn" data-tip="Fetch &amp; Score · costs Sonnet and Haiku calls" id="run-btn" aria-label="Fetch and score"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.52 14.74A8 8 0 1 1 18.55 7.41L21.5 9"/><polyline points="21.5 3.8 21.5 9 16.5 9"/></svg></button>
     <button class="rail-btn" data-tip="Research Brief · costs one Sonnet call" id="brief-btn" aria-label="Research Brief"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><line x1="8.5" y1="12" x2="15" y2="12"/><line x1="8.5" y1="16" x2="15" y2="16"/><line x1="8.5" y1="19" x2="12.5" y2="19"/></svg></button>
     <button class="rail-btn" data-tip="Export shown papers" id="export-btn" aria-label="Export shown papers"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
     <div class="rail-spacer"></div>
@@ -1525,7 +1551,7 @@
               <input type="checkbox" id="prefilter-toggle" checked>
               <span class="check-label">Haiku prefilter</span>
             </label>
-            <div class="hint check-hint">A cheaper Haiku pass drops low-scoring papers before Sonnet scores them.</div>
+            <div class="hint check-hint">A cheaper Haiku pass drops low-scoring papers before Sonnet sees them.</div>
           </div>
 
           <details class="advanced">
@@ -1736,7 +1762,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.10';
+const VERSION = 'v3.11';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -4152,7 +4178,7 @@ const PAGE_SCORE_CSS = `
 // ── EXPORT ────────────────────────────────────────────────────────────────────
 function exportVisible() {
   const visible = getVisiblePapers();
-  if (!visible.length) { showError('Nothing to export — no papers are currently shown.'); return; }
+  if (!visible.length) { showNotice('Nothing to export — no papers are currently shown.'); return; }
 
   const dateStr   = new Date().toISOString().split('T')[0];
   const timestamp = new Date().toLocaleString();
@@ -4448,6 +4474,7 @@ function renderPapers() {
     card.dataset.id = p.id;
 
     const href = safeUrl(p.link);
+    if (href) card.classList.add('linked');
     const title = escHtml(p.title);
     const linkHtml = href
       ? `<a href="${escHtml(href)}" target="_blank" rel="noopener">${title}</a>`
@@ -4640,19 +4667,77 @@ function setStatus(text) {
   // through the same mechanism as everything else, not a title attribute.
   el.dataset.tip = text;
   if (window.refreshTip) window.refreshTip(el);
+  syncRunBtn();
 }
 
+const RUN_BTN_IDLE_TIP = 'Fetch & Score \u00b7 costs Sonnet and Haiku calls';
+
+// The rail's run button mirrors the sidebar's rather than holding a state of its
+// own, so there is one answer to "is a run going" and no pair to keep in step.
+// The sidebar disables Fetch for exactly as long as a run lasts, which is what
+// this reads. While a run is going the button spins, turns red, and means Stop.
+function syncRunBtn() {
+  const rail  = document.getElementById('run-btn');
+  const fetch = document.getElementById('fetch-btn');
+  if (!rail || !fetch) return;
+  const running = fetch.disabled;
+  const status  = document.getElementById('status-line').textContent;
+  rail.classList.toggle('busy', running);
+  // The action goes first: a hover has to say what a click does before it says
+  // how far along the run is.
+  rail.dataset.tip = running ? `Stop this run \u00b7 ${status}`
+                             : RUN_BTN_IDLE_TIP;
+  rail.setAttribute('aria-label', running ? 'Stop this run' : 'Fetch and score');
+  if (window.refreshTip) window.refreshTip(rail);
+}
+
+
+// Red is for a failure: something broke, or something is no longer being saved,
+// and the run cannot deliver what it promised. It is not for "you have not
+// filled in your API key yet" or "nothing is shown to export" — those are
+// ordinary states of the app, and dressing them in red taught the PI to read a
+// red box as noise, which is the one thing it must never become. If the message
+// tells the PI to go and do something perfectly normal, it is a notice.
 function showError(msg) {
   addMessage(msg, 'error-msg', '⚠');
 }
 
 // Not every message is a failure. The paper cap and the storage warning are
 // information, and a red box overstated them.
-function showNotice(msg) {
-  addMessage(msg, 'notice-msg', 'ℹ');
+// A notice given a kind can be silenced, and then no notice of that kind
+// appears again until Clear cache. Three of them carry one: a source that did
+// not answer, a source that answered for part of its window, and the paper cap.
+// Muting those is safe because none of them is a state the app fails to recover
+// from on its own — a source that failed or came back partial keeps its old
+// coverage mark, so its window is asked for again on the next run whether or not
+// the run said so. Muting costs the report, never the papers.
+//
+// Deliberately one mute per kind, not per source: the thing muting protects
+// against is being told the same thing every run, and a per-source list would
+// have to be re-muted every time a different relay had a bad week. And
+// deliberately nothing on the red box, which is for the states that do not heal
+// themselves — that split is the whole reason the red box is worth reading.
+const MUTED_NOTICES_KEY = 'litmonitor_muted_notices';
+
+function mutedNotices() {
+  try {
+    const v = JSON.parse(localStorage.getItem(MUTED_NOTICES_KEY) || '[]');
+    return new Set(Array.isArray(v) ? v : []);
+  } catch { return new Set(); }
 }
 
-function addMessage(msg, cls, glyph) {
+function muteNotice(kind) {
+  const set = mutedNotices();
+  set.add(kind);
+  lsSet(MUTED_NOTICES_KEY, JSON.stringify([...set]));
+}
+
+function showNotice(msg, kind) {
+  if (kind && mutedNotices().has(kind)) return;
+  addMessage(msg, 'notice-msg', 'ℹ', kind);
+}
+
+function addMessage(msg, cls, glyph, kind) {
   const area = document.getElementById('error-area');
   const div = document.createElement('div');
   div.className = cls;
@@ -4666,7 +4751,17 @@ function addMessage(msg, cls, glyph) {
   close.dataset.tip = 'Dismiss. The next run reports again if it still applies.';
   close.innerHTML = '&times;';
   close.addEventListener('click', () => div.remove());
-  div.append(text, close);
+  if (kind) {
+    const mute = document.createElement('button');
+    mute.className = 'msg-mute';
+    mute.type = 'button';
+    mute.textContent = 'Don\u2019t show again';
+    mute.dataset.tip = 'Silence this kind of notice. Clear cache brings it back.';
+    mute.addEventListener('click', () => { muteNotice(kind); div.remove(); });
+    div.append(text, mute, close);
+  } else {
+    div.append(text, close);
+  }
   area.appendChild(div);
 }
 
@@ -4724,15 +4819,15 @@ async function runFetchAndScore() {
   const exampleLines = examplesForPrompt(examples);
   const fp = profileFingerprint(profile, priorityAuthors, exampleLines);
 
-  if (!apiKey) { showError('Enter your Anthropic API key under LLM API key in the sidebar.'); return; }
-  if (!profile) { showError('Fill in at least Prioritize or Transferable methods in the Research profile panel — the person icon in the left rail.'); return; }
+  if (!apiKey) { showNotice('Enter your Anthropic API key under LLM API key in the sidebar.'); return; }
+  if (!profile) { showNotice('Fill in at least Prioritize or Transferable methods in the Research profile panel — the person icon in the left rail.'); return; }
 
   const selectedJournals = JOURNALS.filter(j => {
     const cb = document.querySelector(`[data-journal-id="${j.id}"]`);
     return cb && cb.checked;
   });
   selectedJournals.push(...parseCustomJournals());
-  if (!selectedJournals.length) { showError('Please select at least one journal.'); return; }
+  if (!selectedJournals.length) { showNotice('Please select at least one journal.'); return; }
 
   saveSettings();
   clearErrors();
@@ -4744,6 +4839,7 @@ async function runFetchAndScore() {
   const stopBtn  = document.getElementById('stop-btn');
   fetchBtn.disabled = true;
   stopBtn.style.display = '';
+  syncRunBtn();
   resetRunUsage();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
@@ -4864,7 +4960,7 @@ async function runFetchAndScore() {
   // covers are re-requested by the next successful run. Saying so is the
   // difference between a warning and an alarm.
   if (fetchErrors.length) {
-    showError(`A source was unreachable — nothing you did, and nothing for you to do. arXiv is read through free public relays and OpenAlex rate-limits, so both drop out from time to time. Papers from the other sources are still scored, and the days this source owes stay marked as not covered, so the next run that reaches it asks for them again.\nUnreachable: ${fetchErrors.join(' | ')}`);
+    showNotice(`A source was unreachable — nothing you did, and nothing for you to do. arXiv is read through free public relays and OpenAlex rate-limits, so both drop out from time to time. Papers from the other sources are still scored, and the days this source owes stay marked as not covered, so the next run that reaches it asks for them again.\nUnreachable: ${fetchErrors.join(' | ')}`, 'source-down');
   }
   // A partial is not a failure: the source answered, but not for the whole
   // window, so it is reported separately and never subtracted from the count of
@@ -4879,14 +4975,15 @@ async function runFetchAndScore() {
       if (!byReason.get(n.reason).includes(n.source)) byReason.get(n.reason).push(n.source);
     });
     const lines = [...byReason].map(([reason, sources]) => `${sources.slice().sort().join(', ')} — ${reason}`);
-    showNotice(`Fetched, but not in full — nothing you did, and nothing for you to do. A source answered for part of its window only, which is normal for a free relay. Those days stay marked as not covered, so the next run that works asks for them again.\n${lines.join('\n')}`);
+    showNotice(`Fetched, but not in full — nothing you did, and nothing for you to do. A source answered for part of its window only, which is normal for a free relay. Those days stay marked as not covered, so the next run that works asks for them again.\n${lines.join('\n')}`, 'partial-fetch');
   }
 
   if (allPapers.length === 0) {
     clearProgress();
-    showError('No papers found. Try increasing "Fetch days back", or check that journals are selected.');
+    showNotice('No papers found. Try increasing "Fetch days back", or check that journals are selected.');
     fetchBtn.disabled = false;
     stopBtn.style.display = 'none';
+    syncRunBtn();
     setStatus('ready');
     return;
   }
@@ -4939,7 +5036,7 @@ async function runFetchAndScore() {
     const worst = Object.entries(capped.droppedBySource)
       .sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([k, n]) => `${k} −${n}`).join(', ');
-    showNotice(`Fetched ${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). Reduce "Fetch days back" or add terms to the arXiv.cs filter to stay under the limit.`);
+    showNotice(`Fetched ${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). Reduce "Fetch days back" or add terms to the arXiv.cs filter to stay under the limit.`, 'paper-cap');
     allPapers = capped.kept;
   }
 
@@ -5000,6 +5097,7 @@ async function runFetchAndScore() {
       clearProgress();
       stopBtn.style.display = 'none';
       fetchBtn.disabled = false;
+      syncRunBtn();
       setStatus('cancelled');
       return;
     }
@@ -5113,6 +5211,7 @@ async function runFetchAndScore() {
   clearProgress();
   stopBtn.style.display = 'none';
   fetchBtn.disabled = false;
+  syncRunBtn();
   const now = new Date();
   // Only a clean run advances the clock. An aborted run, or one where a feed
   // failed, has not actually covered its window, and under "Auto" the next run
@@ -5527,7 +5626,7 @@ document.getElementById('stop-btn').addEventListener('click', () => {
     range.disabled = !box.checked;
     const thresh = document.getElementById('haiku-threshold').value || 3;
     box.closest('.check-row').title = box.checked
-      ? `Papers scoring ≤ ${thresh} with Haiku are dropped before Sonnet scores them.`
+      ? `Papers scoring ≤ ${thresh} with Haiku are dropped before Sonnet sees them.`
       : 'Every fetched paper goes straight to Sonnet.';
   };
   box.checked = haikusPrefilter;
@@ -5622,10 +5721,10 @@ document.getElementById('export-btn').addEventListener('click', exportVisible);
 document.getElementById('brief-btn').addEventListener('click', async () => {
   const briefBtn = document.getElementById('brief-btn');
   const apiKey   = document.getElementById('api-key-input').value.trim();
-  if (!apiKey) { showError('Enter your Anthropic API key under LLM API key in the sidebar.'); return; }
+  if (!apiKey) { showNotice('Enter your Anthropic API key under LLM API key in the sidebar.'); return; }
 
   const visible = getVisiblePapers();  // honours current filter, min-score, and search
-  if (!visible.length) { showError('No papers are currently shown — nothing to brief.'); return; }
+  if (!visible.length) { showNotice('No papers are currently shown — nothing to brief.'); return; }
 
   // The cap keeps the best papers, not the newest. getVisiblePapers() returns
   // the starred view in the order the papers were starred, which is what that
@@ -5650,7 +5749,7 @@ document.getElementById('brief-btn').addEventListener('click', async () => {
   // Browsers block window.open() called after an await.
   const win = window.open('', '_blank');
   if (!win) {
-    showError('The popup was blocked. Allow popups for this page and try again.');
+    showNotice('The popup was blocked. Allow popups for this page and try again.');
     return;
   }
   // Loading page: full masthead + footer so the page doesn't flash unstyled.
@@ -6135,7 +6234,7 @@ document.getElementById('backup-download-btn').addEventListener('click', () => {
   // readBackup refuses a file with nothing in it, so writing one would hand the
   // PI a file that fails at the moment it is needed. Refuse at the near end.
   if (!Object.keys(payload.data).length) {
-    showError('There is nothing to back up yet — fill in your research profile and pick your journals first.');
+    showNotice('There is nothing to back up yet — fill in your research profile and pick your journals first.');
     return;
   }
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -6201,7 +6300,7 @@ document.getElementById('restore-file').addEventListener('change', ev => {
 });
 
 document.getElementById('clear-cache-btn').addEventListener('click', () => {
-  if (confirm('Clear all caches?\n\n\u2022 The current feed is cleared and every paper is re-scored on the next run.\n\u2022 Dismissed papers reappear.\n\u2022 Starred papers and learned examples are kept.')) {
+  if (confirm('Clear all caches?\n\n\u2022 The current feed is cleared and every paper is re-scored on the next run.\n\u2022 Dismissed papers reappear, and so do notices you silenced.\n\u2022 Starred papers and learned examples are kept.')) {
     seenIds.clear();
     saveSeenIds();
     dismissed.clear();
@@ -6217,6 +6316,9 @@ document.getElementById('clear-cache-btn').addEventListener('click', () => {
     // caches means asking for everything again, so it has to go too.
     localStorage.removeItem(ARXIV_COVERED_KEY);
     localStorage.removeItem(SOURCE_COVERED_KEY);
+    // A silenced notice is silenced about the cached state of the world, so it
+    // comes back with everything else the cache was hiding.
+    localStorage.removeItem(MUTED_NOTICES_KEY);
     quotaWarned = false;
     storageFull = false;
     renderPapers();
@@ -6489,7 +6591,7 @@ ${pageIcon()}
     <h2>8. Reading Results</h2>
 
     <h3>The left rail</h3>
-    <p>From the top: <span class="ui-label">${railIcon('brief-btn')}Research Brief</span> and <span class="ui-label">${railIcon('export-btn')}Export</span>, which act on the papers currently shown and say how many in their hover text. At the foot: <span class="ui-label">${railIcon('profile-btn')}Research profile</span>, the theme control, <span class="ui-label">${railIcon('docs-btn')}Documentation</span>, and <span class="ui-label">${railIcon('backup-btn')}Back up &amp; restore</span>. Hovering any of them names it.</p>
+    <p>From the top: <span class="ui-label">${railIcon('run-btn')}Fetch &amp; Score</span>, which starts a run and, while one is going, spins and turns red and stops it; then <span class="ui-label">${railIcon('brief-btn')}Research Brief</span> and <span class="ui-label">${railIcon('export-btn')}Export</span>, which act on the papers currently shown and say how many in their hover text. At the foot: <span class="ui-label">${railIcon('profile-btn')}Research profile</span>, the theme control, <span class="ui-label">${railIcon('docs-btn')}Documentation</span>, and <span class="ui-label">${railIcon('backup-btn')}Back up &amp; restore</span>. Hovering any of them names it.</p>
 
     <p><strong>Back up &amp; restore.</strong> Everything you type lives in this browser and nowhere else, so a browser set to clear cookies and site data when it closes erases your profile, journals and settings with no warning and no way back. <span class="ui-label">${railIcon('backup-btn')}Back up &amp; restore</span> writes one small file holding your research profile, journal selection, fetch settings, starred papers and learned examples; restoring reads it back and reloads. Your API key is deliberately not in the file, so it is safe to email, and you re-enter the key after restoring. Cached scores are not in it either &mdash; they rebuild themselves on the next run.</p>
     <h3>Messages</h3>
@@ -6511,11 +6613,12 @@ ${pageIcon()}
     <p>Under the abstract, one sentence explains why Claude assigned the score it did. This is what you use to calibrate your profile over time.</p>
 
     <h3>Card actions</h3>
-    <p>The paper's title is the link to the paper.</p>
+    <p>Clicking anywhere on a card opens the paper &mdash; the score, the journal, the date, the title, the authors, the score reasoning, and the space between them. The abstract and the row of buttons are the two exceptions, because a click there already means something else, and a card whose paper has no resolvable link is not clickable at all.</p>
     <p><span class="ui-label">Copy citation</span> puts a formatted citation on the clipboard. A preprint is labelled as one and always carries its URL.</p>
     <p><span class="ui-label">&#9734; Star</span> keeps the paper in the <span class="ui-label">&#9733; Starred</span> view across runs, whether or not a later run fetches it again. Click again to remove it. Starred papers survive <span class="ui-label">Clear cache</span>.</p>
     <p><span class="ui-label">+ More like this</span> records the paper as a <span class="ui-label">Learned example</span>. The examples are listed in the <span class="ui-label">Research profile</span> panel and pasted verbatim into the scoring prompt as calibration for what an 8&ndash;10 looks like, so the next run scores against them. Adding one invalidates the score cache, so that run re-scores rather than mixing old and new judgements.</p>
-    <p><span class="ui-label">Dismiss</span> removes the card and records the paper as dismissed, so it won't reappear in future runs. <span class="ui-label">Clear cache</span> brings dismissed papers back.</p>
+    <p><span class="ui-label">Dismiss</span> removes the card and records the paper as dismissed, so it won't reappear in future runs. <span class="ui-label">Clear cache</span> brings dismissed papers back, and any notice you silenced with it.</p>
+    <p>A message about the run itself &mdash; a source that did not answer, a source that answered for part of its window, the paper cap &mdash; carries a <span class="ui-label">Don&rsquo;t show again</span> button beside its dismiss cross. Pressing it silences that <em>kind</em> of notice for good, whichever source it is about next time, until <span class="ui-label">Clear cache</span>. That is safe because a source that failed or came back partial keeps its old coverage mark either way, so its window is asked for again on the next run whether or not the run says so &mdash; silencing costs you the report, never the papers. Messages in the red box have no such button: those are the ones that do not fix themselves.</p>
   </div>
 
   <!-- 9. FILTER & SEARCH -->
@@ -6580,7 +6683,7 @@ function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;v
 
   const win = window.open('', '_blank');
   if (!win) {
-    showError('The popup was blocked. Allow popups for this page and try again.');
+    showNotice('The popup was blocked. Allow popups for this page and try again.');
     return;
   }
   win.document.open();
@@ -6589,7 +6692,32 @@ function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;v
 }
 
 // Fetch button
+// The title was the only way into the paper: a two-line target on a card that
+// is otherwise dead space. The whole card opens it now, except where a click
+// already means something else — the buttons, the title's own anchor, and the
+// abstract, which is there to be read and selected rather than pressed.
+// Delegated from the container and registered once, because renderPapers()
+// replaces every card on every render.
+document.getElementById('papers-container').addEventListener('click', e => {
+  if (e.target.closest('button, a, .card-abstract')) return;
+  const card = e.target.closest('.paper-card');
+  if (!card) return;
+  // Finishing a drag over the authors line is a selection, not a click.
+  const sel = window.getSelection();
+  if (sel && String(sel).trim()) return;
+  const link = card.querySelector('.paper-title a');
+  if (link) window.open(link.href, '_blank', 'noopener');
+});
+
 document.getElementById('fetch-btn').addEventListener('click', fetchAndScore);
+
+// A proxy, not a second implementation: the API key, profile and journal checks
+// all live behind the sidebar's button and are still the only copy of them.
+document.getElementById('run-btn').addEventListener('click', () => {
+  const fetchBtn = document.getElementById('fetch-btn');
+  (fetchBtn.disabled ? document.getElementById('stop-btn') : fetchBtn).click();
+});
+syncRunBtn();   // paint the idle state at load
 
 // No default profile fields — each user should fill in their own Research Profile.
 
