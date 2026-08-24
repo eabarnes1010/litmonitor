@@ -1680,7 +1680,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.4';
+const VERSION = 'v3.5';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -2632,11 +2632,19 @@ function costPerPaper(spend) {
 // PRICE_VERIFIED is deliberately not shown: it is the date someone last checked
 // the published rates by hand, which nobody reading this line can act on,
 // verify or refresh. It stays in the source, where the person who can is.
+// Money is written in cents. A third decimal was reporting a precision the
+// figure does not have — the rates are list prices, not what the account pays —
+// and a run that cost something is worth saying so even when it rounds to zero.
+function usd(n) {
+  if (n > 0 && n < 0.005) return '<$0.01';
+  return `$${n.toFixed(2)}`;
+}
+
 function spendLine(spend, usage) {
   const month = (spend && spend.cost) ? spend.cost : 0;
   const parts = [];
-  if (usage && usage.calls) parts.push(`$${usage.cost.toFixed(3)} this run`);
-  parts.push(`$${month.toFixed(2)} in ${MONTH_NAMES[new Date().getMonth()]}`);
+  if (usage && usage.calls) parts.push(`${usd(usage.cost)} this run`);
+  parts.push(`${usd(month)} in ${MONTH_NAMES[new Date().getMonth()]}`);
   if (spend && spend.papers > 0) parts.push(`${spend.papers} papers scored`);
   return parts.join(' · ');
 }
@@ -2900,9 +2908,44 @@ function arxivApiUrl(cat, cutoff, now, start) {
 // what produced this release's OpenAlex 429s. Probing arXiv without it earned a
 // 429 and then a 503 within a few minutes.
 const ARXIV_MIN_GAP_MS = 3000;
-// How far arXiv's submittedDate index trails the announcement, measured
-// 2026-08-24: cs.LG returned 0 papers for a 2-day window, 43 for 3, 148 for 4.
-const ARXIV_INDEX_LAG_DAYS = 3;
+// How far back each arXiv category has already been asked for, so a run does not
+// re-request days it has.
+//
+// What counts as covered is the newest submission the query actually returned,
+// not a guess about how far arXiv's index trails. An earlier version subtracted
+// a measured three-day lag and skipped any window shorter than that — which
+// assumed arXiv's behaviour would not change, and would have dropped days
+// silently the moment it did. Reading it off the response cannot go stale.
+// Keyed by category, stored as ISO dates.
+const ARXIV_COVERED_KEY = 'litmonitor_arxiv_covered';
+
+function loadArxivCovered() {
+  try {
+    const raw = localStorage.getItem(ARXIV_COVERED_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch(e) { return {}; }
+}
+
+function markArxivCovered(cat, papers) {
+  // The newest submission in the answer. Papers older than that are ours; the
+  // ground between it and now is what the next run still has to ask for.
+  const newest = papers.reduce((max, p) => {
+    const t = p.date instanceof Date ? p.date.getTime() : Date.parse(p.date);
+    return isFinite(t) && t > max ? t : max;
+  }, 0);
+  if (!newest) return;                       // an empty window covers nothing
+  const covered = loadArxivCovered();
+  covered[cat] = new Date(newest).toISOString();
+  lsSet(ARXIV_COVERED_KEY, JSON.stringify(covered), true);
+}
+
+// The window actually worth asking for: never earlier than the user's cutoff,
+// never re-covering ground a previous successful query already covered.
+function arxivWindowStart(cat, cutoff, covered) {
+  const seen = covered[cat] ? new Date(covered[cat]) : null;
+  return (seen && !isNaN(seen) && seen > cutoff) ? seen : cutoff;
+}
 let arxivNextSlot = 0;
 
 async function arxivSlot() {
@@ -2986,11 +3029,18 @@ async function fetchArxivBoth(j, cat, cutoff, fetchErrors, partialNotes) {
   // only reaches back that far cannot contain anything the feed did not already
   // give us — asking is a wasted relay call, and relay calls are the scarce
   // thing. A wider window is exactly the catching-up case, so it still asks.
-  const windowDays = (Date.now() - cutoff.getTime()) / 86400000;
-  if (cat && windowDays > ARXIV_INDEX_LAG_DAYS) {
+  // Asked every run, for whatever ground is not covered yet. Nothing here
+  // predicts what arXiv will have: if the window comes back empty, it comes back
+  // empty and the same days are asked for again next time.
+  const now = new Date();
+  const start = cat ? arxivWindowStart(cat, cutoff, loadArxivCovered()) : cutoff;
+  if (cat && start < now) {
     try {
-      const api = await fetchArxivApi(cat, j.name, cutoff, new Date());
+      const api = await fetchArxivApi(cat, j.name, start, now);
       add(api.papers);
+      // Only a complete answer counts as covered; a capped one left its oldest
+      // papers behind, and those days must stay askable.
+      if (!api.capped) markArxivCovered(cat, api.papers);
       if (api.capped) {
         partialNotes.push({ source: j.name,
           reason: `more papers in that window than a run fetches (${api.total} against ${ARXIV_API_PAGES * ARXIV_API_MAX})` });
@@ -5565,6 +5615,9 @@ document.getElementById('clear-cache-btn').addEventListener('click', () => {
     papers = [];
     newIdsThisRun = new Set();
     localStorage.removeItem('litmonitor_feed');
+    // Coverage says which arXiv days have already been asked for. Clearing the
+    // caches means asking for everything again, so it has to go too.
+    localStorage.removeItem(ARXIV_COVERED_KEY);
     quotaWarned = false;
     storageFull = false;
     renderPapers();
@@ -5902,7 +5955,7 @@ ${pageIcon()}
     <h3>Using New only</h3>
     <p>After your first run, use the <span class="ui-label">New only</span> filter on subsequent days to focus on papers you haven't seen before. The seen-papers cache persists across sessions so this works even if you close and reopen the app.</p>
     <h3>Clearing the cache</h3>
-    <p>The <span class="ui-label">Clear cache</span> button at the foot of the sidebar resets the seen-papers history, the dismissed-papers list, the current feed, <em>and</em> both score caches. All papers will be marked as new and re-scored from scratch on the next run. Use this if you want a completely fresh start or if browser storage has filled up. A profile edit invalidates the score cache on its own, so it is not needed after revising the profile.</p>
+    <p>The <span class="ui-label">Clear cache</span> button at the foot of the sidebar resets the seen-papers history, the dismissed-papers list, the current feed, both score caches, <em>and</em> the record of which arXiv days have already been fetched. All papers will be marked as new and re-scored from scratch on the next run. Use this if you want a completely fresh start or if browser storage has filled up. A profile edit invalidates the score cache on its own, so it is not needed after revising the profile.</p>
 
     <h3>Theme</h3>
     <p>The theme control at the foot of the left rail cycles <strong>System</strong>, <strong>Light</strong>, <strong>Dark</strong>. The icon shows the mode in force — a half-filled circle for System, a sun for Light, a moon for Dark — and hovering it says what a click will do. <strong>System</strong> follows your operating system and keeps following it, so a machine that switches to dark in the evening switches this with it; it is what you get until you choose otherwise. The preference is saved in local storage and persists across sessions, and the Export, Brief and Documentation pages are painted with whatever the app is using at the moment they are generated.</p>
