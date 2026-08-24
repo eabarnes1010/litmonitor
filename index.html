@@ -744,7 +744,7 @@
      column of the shell rather than an overlay, so opening it narrows the feed
      instead of covering it. It is only ever collapsed, never removed, so its
      fields keep their ids and their values throughout. */
-  #profile-panel {
+  #profile-panel, #backup-panel {
     flex: 0 0 0px;
     min-width: 0;
     overflow: hidden;
@@ -758,7 +758,7 @@
     visibility: hidden;
     transition: flex-basis 0.25s ease, visibility 0s linear 0.25s;
   }
-  #profile-panel.open {
+  #profile-panel.open, #backup-panel.open {
     flex-basis: 440px;
     border-right-color: var(--border);
     visibility: visible;
@@ -803,6 +803,27 @@
   }
   .panel-close:hover { background: var(--surface2); color: var(--text); }
   .panel-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* The intro is separated by a rule so it reads as being about the panel
+     rather than about the first button. */
+  .backup-intro {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text3);
+    margin: 0 0 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .backup-group { margin-bottom: 22px; }
+  /* :last-child would never match — the hidden file picker is the body's
+     last child. */
+  .backup-group:last-of-type { margin-bottom: 0; }
+  .backup-group .btn { width: 100%; margin: 0 0 6px; }
+  .backup-note {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text3);
+    margin: 0;
+  }
   .panel-body {
     flex: 1;
     overflow-y: auto;
@@ -1380,8 +1401,8 @@
       border-bottom: 1px solid var(--border);
     }
     .sidebar-body { overflow-y: auto; }
-    #profile-panel { height: auto; position: static; border-right: none; }
-    #profile-panel.open {
+    #profile-panel, #backup-panel { height: auto; position: static; border-right: none; }
+    #profile-panel.open, #backup-panel.open {
       flex-basis: auto;
       max-height: 70vh;
       border-bottom: 1px solid var(--border);
@@ -1408,8 +1429,43 @@
     <div class="rail-spacer"></div>
     <button class="rail-btn" data-tip="Research profile" id="profile-btn" aria-label="Research profile"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></button>
     <button class="rail-btn" data-tip="Switch theme" id="theme-toggle-btn" aria-label="Switch theme"></button>
-    <button class="rail-btn" data-tip="Documentation" id="docs-btn" aria-label="Documentation"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></button>
+    <!-- A closed book at 19px reads as a plain rectangle. A circled question
+         mark is what every other app uses for help, and it survives the size. -->
+    <button class="rail-btn" data-tip="Documentation" id="docs-btn" aria-label="Documentation"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.3a2.7 2.7 0 0 1 5.2.9c0 1.8-2.6 2.2-2.6 3.9"/><circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none"/></svg></button>
+    <!-- An archive box: the standard "keep a copy of this somewhere safe". The
+         tray-and-down-arrow above it already means "download what is on screen",
+         so reusing it here would name two different things the same way. -->
+    <button class="rail-btn" data-tip="Back up &amp; restore settings" id="backup-btn" aria-label="Back up and restore settings" aria-expanded="false"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4.5" rx="1"/><path d="M4.8 8.5v10a1.5 1.5 0 0 0 1.5 1.5h11.4a1.5 1.5 0 0 0 1.5-1.5v-10"/><line x1="10" y1="12.5" x2="14" y2="12.5"/></svg></button>
   </div>
+
+  <!-- Back up & restore.
+       localStorage is the only copy of everything typed into this app, and a
+       browser set to clear site data on quit takes the lot with no warning —
+       which is exactly how this panel came to exist. A panel rather than two
+       sidebar buttons because restoring needs a sentence of explanation before
+       anyone clicks it. -->
+  <aside id="backup-panel" aria-hidden="true" aria-label="Back up and restore settings">
+    <div class="panel-head">
+      <span class="panel-title"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4.5" rx="1"/><path d="M4.8 8.5v10a1.5 1.5 0 0 0 1.5 1.5h11.4a1.5 1.5 0 0 0 1.5-1.5v-10"/><line x1="10" y1="12.5" x2="14" y2="12.5"/></svg> Back up &amp; restore</span>
+      <button class="panel-close" id="backup-close" aria-label="Close backup">&#10005;</button>
+    </div>
+    <div class="panel-body">
+      <p class="backup-intro">This app keeps everything in your browser and nowhere else. A browser set to clear cookies and site data when it closes will erase your profile, journals and settings without asking. A backup file is the only way back.</p>
+      <!-- Each button owns the paragraph beneath it: the caption sits tight
+           under its own button and the gap between the two groups is wider, so
+           there is no reading in which a paragraph belongs to the button below
+           it. -->
+      <div class="backup-group">
+        <button class="btn btn-ghost btn-sm" id="backup-download-btn">Back up settings to a file</button>
+        <p class="backup-note">Saves your research profile, journal selection, fetch settings, starred papers and learned examples. Your API key is <strong>not</strong> included, so the file is safe to email. Cached scores are not included either &mdash; they rebuild themselves.</p>
+      </div>
+      <div class="backup-group">
+        <button class="btn btn-ghost btn-sm" id="restore-btn">Restore from a file</button>
+        <p class="backup-note">Replaces what is in the browser now with what the file holds, then reloads. Your API key and cached scores are left alone.</p>
+      </div>
+      <input type="file" id="restore-file" accept="application/json,.json" hidden>
+    </div>
+  </aside>
 
   <!-- Sidebar -->
   <aside id="sidebar">
@@ -1529,7 +1585,7 @@
         <div class="group-content collapsed" id="sources-group">
           <div class="sidebar-section">
             <label>Custom journals</label>
-            <textarea id="custom-journals-input" rows="2" placeholder="Name | S-ID or ISSN&#10;e.g. Nature Sustainability | S4210178125&#10;e.g. My Journal | 1234-5678"></textarea>
+            <textarea id="custom-journals-input" rows="2" placeholder="Name | S-ID or ISSN&#10;e.g. One Earth | S2765128192&#10;e.g. My Journal | 1234-5678"></textarea>
             <div class="hint">One per line &middot; Find IDs at <a href="https://openalex.org" target="_blank">openalex.org</a></div>
           </div>
           <div class="sidebar-section">
@@ -1680,7 +1736,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.7';
+const VERSION = 'v3.9';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -1734,6 +1790,12 @@ const JOURNALS = [
     openalexIssn: "1520-0477"
   },
   {
+    id: "earth-system-dynamics",
+    name: "Earth System Dynamics",
+    type: "openalex",
+    openalexIssn: "2190-4979"
+  },
+  {
     id: "earthsfuture",
     name: "Earth's Future (AGU)",
     type: "openalex",
@@ -1745,6 +1807,12 @@ const JOURNALS = [
     type: "openalex",
     openalexSourceId: "S4306401273",
     preprint: true
+  },
+  {
+    id: "ecology-society",
+    name: "Ecology and Society",
+    type: "openalex",
+    openalexIssn: "1708-3087"
   },
   {
     id: "eds",
@@ -1765,16 +1833,40 @@ const JOURNALS = [
     openalexIssn: "1748-9326"
   },
   {
+    id: "frontiers-earth-sci",
+    name: "Frontiers in Earth Science",
+    type: "openalex",
+    openalexSourceId: "S178385311"
+  },
+  {
+    id: "frontiers-envs",
+    name: "Frontiers in Environmental Science",
+    type: "openalex",
+    openalexIssn: "2296-665X"
+  },
+  {
     id: "gmd",
     name: "Geoscientific Model Development",
     type: "openalex",
     openalexIssn: "1991-959X"
   },
   {
+    id: "global-environmental-change",
+    name: "Global Environmental Change",
+    type: "openalex",
+    openalexIssn: "0959-3780"
+  },
+  {
     id: "grl",
     name: "GRL (AGU)",
     type: "openalex",
     openalexIssn: "1944-8007"
+  },
+  {
+    id: "hess",
+    name: "Hydrology and Earth System Science",
+    type: "openalex",
+    openalexIssn: "1027-5606"
   },
   {
     id: "james",
@@ -1793,6 +1885,12 @@ const JOURNALS = [
     name: "JGR: Machine Learning and Computation (AGU)",
     type: "openalex",
     openalexIssn: "2993-5210"
+  },
+  {
+    id: "jhm",
+    name: "Journal of Hydrometeorology",
+    type: "openalex",
+    openalexIssn: "1525-7541"
   },
   {
     id: "ml-earth",
@@ -1825,6 +1923,47 @@ const JOURNALS = [
     openalexIssn: "2041-1723"
   },
   {
+    id: "nature-food",
+    name: "Nature Food",
+    type: "openalex",
+    openalexSourceId: "S4210207988"
+  },
+  {
+    id: "nature-geo",
+    name: "Nature Geoscience",
+    type: "openalex",
+    openalexSourceId: "S48977010"
+  },
+  {
+    id: "nature-mi",
+    name: "Nature Machine Intelligence",
+    type: "openalex",
+    openalexSourceId: "S4306400806"
+  },
+  {
+    id: "nature-reviews-earth-env",
+    name: "Nature Reviews Earth & Environment",
+    type: "openalex",
+    openalexIssn: "2662-138X"
+  },
+  {
+    // Both sides of the v3.9 merge added Nature Sustainability. This is the id
+    // and source read from the OpenAlex sources API on the settings-backup
+    // branch, and the one a stored journal selection may already name, so the
+    // ISSN entry that came in with the ten borrowed journals was dropped rather
+    // than left to sit beside it as a second, unchecked copy of one journal.
+    id: "nature-sustain",
+    name: "Nature Sustainability",
+    type: "openalex",
+    openalexSourceId: "S4210178125"
+  },
+  {
+    id: "nature-water",
+    name: "Nature Water",
+    type: "openalex",
+    openalexSourceId: "S4387286383"
+  },
+  {
     id: "npj-climate",
     name: "npj Climate and Atmospheric Science",
     type: "openalex",
@@ -1853,6 +1992,12 @@ const JOURNALS = [
     name: "Scientific Reports (Nature)",
     type: "openalex",
     openalexIssn: "2045-2322"
+  },
+  {
+    id: "wrr",
+    name: "Water Resources Research",
+    type: "openalex",
+    openalexIssn: "0043-1397"
   }
 ];
 
@@ -2471,7 +2616,12 @@ function arxivFilterTerms(domainText, methodsText) {
 // Each call now gets a controller that aborts on its own timeout and also when
 // the run is aborted, so Stop cancels work already in flight.
 const API_TIMEOUT_SCORE = 120000;   // a 20-paper batch with full abstracts
-const API_TIMEOUT_BRIEF = 180000;   // up to 50 papers in one response
+const API_TIMEOUT_BRIEF = 180000;   // the whole shown set in one response
+
+// The Brief reads this many papers at most, in one call, highest-scoring first.
+// A constant rather than a literal because the rail's hover text has to say when
+// the set on screen is larger than the set the Brief will actually read.
+const BRIEF_MAX_PAPERS = 75;
 
 function apiSignal(ms) {
   const ctl = new AbortController();
@@ -2781,6 +2931,26 @@ function buildJournalList() {
 // id means re-scoring every arXiv paper at full price, marking it all new, and
 // losing every arXiv star the first time a run changes path. A v1→v2 revision
 // would mint a third id on top.
+// arXiv carries an author's name as the author typed it, in LaTeX, so a name
+// with a diacritic arrives as an escape: Bj\"orn L\"utjens. Each accent command
+// is the Unicode combining mark it stands for, and NFC composes the pair into
+// the single character, which is why this is a table of seven and not a table of
+// every letter-accent combination. Decoded at ingest, so the card, the export,
+// the Brief, a copied citation and the priority-author match all hold one
+// spelling. Anything more exotic than these seven is left as it arrived.
+const TEX_ACCENTS = { '"': '\u0308', "'": '\u0301', '`': '\u0300', '^': '\u0302',
+                      '~': '\u0303', '=': '\u0304', '.': '\u0307' };
+
+function decodeTexAccents(text) {
+  const raw = String(text || '');
+  if (!raw.includes('\\')) return raw;
+  return raw
+    // \"o and \"{o} are the same accent; the braces are optional.
+    .replace(/\\(["'`^~=.])\s*\{?([A-Za-z])\}?/g, (m, cmd, ch) => ch + TEX_ACCENTS[cmd])
+    .replace(/[{}]/g, '')
+    .normalize('NFC');
+}
+
 function normalizeArxivLink(link) {
   const m = (link || '').match(/^https?:\/\/arxiv\.org\/abs\/(.+?)(v\d+)?\/?$/i);
   return m ? `https://arxiv.org/abs/${m[1]}` : link;
@@ -2876,7 +3046,7 @@ async function fetchArxivViaJson(feedUrl, journalName, cutoff) {
     return {
       id: link,
       title: (it.title || '').trim(),
-      authors: it.author || '',
+      authors: decodeTexAccents(it.author || ''),
       // Raw, exactly as the parseRSS path stores it: the stored abstract is what
       // goes into the scoring prompt, so cleaning it here would mean the same
       // paper scored differently depending on which relay served it.
@@ -3239,7 +3409,7 @@ async function fetchOpenAlex(identifier, journalName, cutoff, isPreprint, sinceC
       const date = new Date(work.publication_date || '');
       if (cutoff && !isNaN(date) && date < cutoff) return;
       const allNames = (work.authorships || [])
-        .map(a => a.author?.display_name || '')
+        .map(a => decodeTexAccents(a.author?.display_name || ''))
         .filter(Boolean);
       // Displayed list stays at five; the full list rides along only so the
       // deterministic priority-author match can see authors past the fifth, which
@@ -3318,7 +3488,7 @@ function parseRSS(xml, journalName, cutoff, isPreprint) {
     if (authorEls.length) {
       authors = [...authorEls].map(a => {
         const name = a.querySelector('name');
-        return (name ? name.textContent : a.textContent).trim();
+        return decodeTexAccents((name ? name.textContent : a.textContent).trim());
       }).join(', ');
     }
 
@@ -3900,7 +4070,11 @@ function updateFeedActionScope(n) {
     else btn.dataset.tip = text;
   };
   set('export-btn', n ? `Export ${noun} as a standalone page` : 'Nothing is shown to export');
-  set('brief-btn',  n ? `Brief ${noun} \u00b7 costs one Sonnet call`
+  // Past the cap the count on the button would promise more than the Brief
+  // reads, so it says which papers are actually going in.
+  set('brief-btn',  n ? (n > BRIEF_MAX_PAPERS
+                          ? `Brief the ${BRIEF_MAX_PAPERS} highest-scoring of ${n} shown papers \u00b7 costs one Sonnet call`
+                          : `Brief ${noun} \u00b7 costs one Sonnet call`)
                       : 'Nothing is shown to brief \u00b7 costs one Sonnet call when it runs');
 }
 
@@ -5220,6 +5394,7 @@ function setProfilePanel(wanted) {
   panel.setAttribute('aria-hidden', String(!wanted));
   btn.setAttribute('aria-expanded', String(wanted));
   if (wanted) {
+    setBackupPanel(false);
     growAllTextareas();   // its fields were last measured while it was collapsed
     document.getElementById('context-input').focus();
   }
@@ -5449,9 +5624,15 @@ document.getElementById('brief-btn').addEventListener('click', async () => {
   const visible = getVisiblePapers();  // honours current filter, min-score, and search
   if (!visible.length) { showError('No papers are currently shown — nothing to brief.'); return; }
 
-  // Cap at 50 papers to keep token usage reasonable
-  const MAX_PAPERS = 50;
-  const allCapped = visible.slice(0, MAX_PAPERS);
+  // The cap keeps the best papers, not the newest. getVisiblePapers() returns
+  // the starred view in the order the papers were starred, which is what that
+  // view should show and the wrong thing to cut on: a large starred collection
+  // would brief the most recently starred and silently drop an older 10. Sort
+  // is stable, so within one score the starred order is still the starred order,
+  // and for every other view this line changes nothing — they arrive by score.
+  const ranked = [...visible].sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
+
+  const allCapped = ranked.slice(0, BRIEF_MAX_PAPERS);
   const omitted   = visible.length - allCapped.length;
 
   // Papers without abstracts are shown in the brief with a placeholder — NOT sent to Sonnet.
@@ -5495,21 +5676,52 @@ ${pageIcon()}
   <div class="masthead">
     <div class="wordmark"><span class="wm-monitor">LitMonitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Research Brief</span></div>
   </div>
-  <p class="loading">Generating briefs for ${toBrief.length} paper${toBrief.length !== 1 ? 's' : ''} — please wait…</p>
+  <p class="loading">Reading ${toBrief.length} paper${toBrief.length !== 1 ? 's' : ''} and writing the brief — please wait…</p>
   <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
 </div></body></html>`);
 
   setRailBusy(briefBtn, true, 'Generating the Brief…');
 
   try {
-    // Build numbered paper list from toBrief only (papers WITH abstracts).
-    // Full abstracts used here — no truncation for brief generation.
-    const paperList = toBrief.map((p, i) => {
-      const parts = [`PAPER ${i + 1}: ${p.title}`];
-      if (p.journal) parts.push(`Journal: ${p.journal}`);
+    // Papers are numbered over allCapped, not over toBrief: the index the model
+    // cites is the index the reference list prints, so a paper with no abstract
+    // still holds its number instead of shifting every later citation by one.
+    const refNum = new Map(allCapped.map((p, i) => [p.id, i + 1]));
+
+    const shortAuthors = p => {
+      if (!p.authors) return '';
+      const list = p.authors.split(',');
+      return list.slice(0, 3).join(',') + (list.length > 3 ? ' et al.' : '');
+    };
+
+    // Full abstracts, not truncated. A synthesis has to name the finding and the
+    // number, and both live in the second half of an abstract. At the 75-paper
+    // cap this is roughly 31k input tokens — about nine cents at Sonnet rates.
+    const paperList = toBrief.map((p) => {
+      const parts = [`[${refNum.get(p.id)}] Score ${p.score}/10 | ${p.journal}`];
+      parts.push(`Title: ${p.title}`);
+      const auth = shortAuthors(p);
+      if (auth) parts.push(`Authors: ${auth}`);
+      // The scoring pass already worked out why this paper matters to this
+      // researcher. Handing that sentence back costs nothing and keeps the
+      // brief anchored to the profile rather than to the abstract alone.
+      if (p.reason) parts.push(`Why it scored: ${p.reason}`);
       parts.push(`Abstract: ${p.abstract}`);
       return parts.join('\n');
-    }).join('\n\n');
+    }).join('\n\n---\n\n');
+
+    // Coverage is read off the papers themselves rather than off Fetch days
+    // back, which says nothing at all when the window is automatic.
+    const fmtDay = d => d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const dates = allCapped
+      .map(p => (p.date instanceof Date ? p.date : p.date ? new Date(p.date) : null))
+      .filter(d => d && !isNaN(d))
+      .sort((a, b) => a - b);
+    const coverageStr = dates.length
+      ? (fmtDay(dates[0]) === fmtDay(dates[dates.length - 1])
+          ? fmtDay(dates[0])
+          : `${fmtDay(dates[0])} – ${fmtDay(dates[dates.length - 1])}`)
+      : '';
 
     const context    = document.getElementById('context-input').value.trim();
     const prioritize = document.getElementById('prioritize-input').value.trim();
@@ -5521,31 +5733,36 @@ ${pageIcon()}
       methods    ? `Methods I find transferable: ${methods}` : '',
     ].filter(Boolean).join('\n');
 
-    // briefById maps paper id → raw brief text from the API.
-    // Declared here so it's always in scope for the card renderer below,
-    // even when we skip the Sonnet call entirely.
-    const briefById = {};
+    const minScore   = document.getElementById('min-score').value;
+    const searchNote = document.getElementById('search-box').value.trim();
+    const viewNote   = currentFilter === 'starred' ? 'starred papers'
+                     : currentFilter === 'new'     ? 'papers new this run'
+                     : 'papers above the score threshold';
 
-    // Only call Sonnet if there are papers with abstracts to brief.
+    // The model's markdown. Declared out here so the renderer below is in scope
+    // even when nothing had an abstract and no call was made at all.
+    let briefMd = '';
+
     if (toBrief.length > 0) {
-      const systemPrompt = `You are a research intelligence analyst writing tightly scoped briefings for a scientist. For each paper write 2–3 bullet points using "-" as the prefix, one bullet per line. The first 1–2 bullets state why the paper matters to the field: the key finding, methodological advance, empirical result, or claim that makes it significant. Be specific — cite numbers, name the method, state the concrete contribution. No generic summaries. The final bullet states why this paper is directly relevant to this specific researcher's work and interests. Be direct. Do not hedge. HARD LIMIT: every bullet must be 15 words or fewer. Cut ruthlessly.`;
+      const systemPrompt = `You are a research intelligence analyst writing a standing brief for one working scientist. You read the whole set and report what it adds up to — the themes running through it, what is genuinely new, and what the set implies for this researcher's own work. You are not summarising papers one at a time. Write for an expert: precise, collegial, dense. Never hedge, never pad, never restate the instructions, and never open with a preamble.`;
 
       const userPrompt = `RESEARCHER PROFILE:
 ${profileBlock || '(not provided)'}
 
-Write a 2–3 bullet brief for EACH of the ${toBrief.length} papers below. Use "-" for each bullet, one per line. First 1–2 bullets = why the paper matters (key finding, what's new, why the field should care). Final bullet = direct relevance to this researcher. Use this exact format — the delimiter lines are required for parsing:
+THE SET: ${toBrief.length} ${viewNote}${coverageStr ? `, covering ${coverageStr}` : ''}, at or above score ${minScore}${searchNote ? `, matching the search "${searchNote}"` : ''}.
 
-===1===
-- [key finding or advance]
-- [additional finding or significance, if needed]
-- [direct relevance to this researcher]
+Write the brief over the papers below.
 
-===2===
-- [key finding or advance]
-- [additional finding or significance, if needed]
-- [direct relevance to this researcher]
-
-...and so on through ===${toBrief.length}===.
+- Total length 700-900 words.
+- Group the papers into 3-6 themes that emerge from the papers themselves. Merge rather than force a theme; do not invent one to hold a single paper unless that paper genuinely stands alone.
+- Each theme is a "## " heading naming the theme, then 2-5 "- " bullets. A bullet states the concrete result: name the method, give the number, say what is new about it. No generic topic description.
+- Cite by bracketed index, like [3], and cite several together where they belong together, like [3][7]. Every substantive claim carries a citation.
+- Weight coverage by score: a paper scoring 9-10 has earned its own bullet, and a lower-scoring paper earns a mention only if it adds something the others do not.
+- Where a paper bears directly on this researcher's stated work, say so in the same bullet, in a clause. Use the "Why it scored" line as evidence; do not quote it back.
+- Ignore any paper scored 0 — that is a scoring failure, not a judgement.
+- Close with a "## Emerging Signals" heading and 3-5 bullets: patterns cutting across the themes, results that contradict each other or the field, and gaps worth watching. This section is the point of the brief, so do not let it become a summary of what you just wrote.
+- Output markdown and nothing else: "## " headings, "- " bullets, **bold** for emphasis. No title, no closing remark.
+- A numbered reference list with links is appended to your text automatically, so never write out an author, a journal or a DOI. The index is the citation.
 
 PAPERS:
 ${paperList}`;
@@ -5564,10 +5781,10 @@ ${paperList}`;
         },
         body: JSON.stringify({
           model: MODEL,
-          // Three bullets per paper at roughly 45 tokens each, times the 50-paper
-          // cap, needs about 7000; 2000 truncated a full brief mid-list and the
-          // delimiter parser then silently dropped every paper after the cut.
-          max_tokens: 8000,
+          // 900 words of markdown is about 1400 tokens. The headroom is there so
+          // that a model which runs long finishes its Emerging Signals section
+          // rather than being cut off in the middle of it.
+          max_tokens: 4000,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
         }),
@@ -5585,59 +5802,70 @@ ${paperList}`;
 
       const apiData = await response.json();
       recordUsage(MODEL, apiData.usage);
-      const rawText = (apiData.content?.find(c => c.type === 'text')?.text || '').trim();
-
-      // Parse per-paper briefs using the ===N=== delimiters.
-      // Indices correspond to toBrief (1-based), NOT allCapped.
-      // Split produces: ['', '1', 'brief1', '2', 'brief2', ...]
-      const parts = rawText.split(/===(\d+)===/);
-      const briefsByIdx = {};
-      for (let i = 1; i < parts.length - 1; i += 2) {
-        briefsByIdx[parseInt(parts[i])] = parts[i + 1].trim();
-      }
-      toBrief.forEach((p, i) => { briefById[p.id] = briefsByIdx[i + 1] || ''; });
+      briefMd = (apiData.content?.find(c => c.type === 'text')?.text || '').trim();
     }
 
-    // Build HTML cards — one per paper in allCapped (preserves score order)
+    // Markdown to HTML, deliberately small. The prompt asks for "## " headings,
+    // "- " bullets and **bold**, so those are what this handles; anything else
+    // is left as a paragraph rather than guessed at. Escaping happens first, so
+    // an angle bracket in the model's text cannot open a tag, and the citation
+    // rewrite runs on already-escaped text where [3] is still literally [3].
+    const mdToHtml = md => {
+      const inline = s => escHtml(s)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\[(\d+)\]/g, (m, n) =>
+          refNum.size >= Number(n) && Number(n) > 0
+            ? `<a class="cite" href="#ref-${n}">[${n}]</a>` : m);
+      const out = [];
+      let inList = false;
+      const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+      md.split('\n').forEach(line => {
+        const l = line.trim();
+        if (!l) { closeList(); return; }
+        const heading = l.match(/^#{1,4}\s+(.+)$/);
+        if (heading) { closeList(); out.push(`<h2 class="theme">${inline(heading[1])}</h2>`); return; }
+        const bullet = l.match(/^[-*•]\s+(.+)$/);
+        if (bullet) {
+          if (!inList) { out.push('<ul class="theme-bullets">'); inList = true; }
+          out.push(`<li>${inline(bullet[1])}</li>`);
+          return;
+        }
+        closeList();
+        out.push(`<p class="theme-para">${inline(l)}</p>`);
+      });
+      closeList();
+      return out.join('\n');
+    };
+
     const dateStr   = new Date().toISOString().split('T')[0];
     const timestamp = new Date().toLocaleString();
 
+    const synthesisHtml = briefMd
+      ? mdToHtml(briefMd)
+      : `<p class="theme-para" style="color:var(--text2);font-style:italic">None of the shown papers has an abstract, so there was nothing to synthesise. The references below are still listed.</p>`;
+
     // themeVars was resolved before window.open() above.
-    const cards = allCapped.map((p) => {
-      const titleHtml = p.link
-        ? `<a href="${p.link}" target="_blank" rel="noopener">${escHtml(p.title)}</a>`
+    const cards = allCapped.map((p, i) => {
+      const href = safeUrl(p.link);
+      const titleHtml = href
+        ? `<a href="${escHtml(href)}" target="_blank" rel="noopener">${escHtml(p.title)}</a>`
         : escHtml(p.title);
       const date = p.date ? (p.date instanceof Date ? p.date : new Date(p.date)) : null;
       const mo   = date && !isNaN(date)
         ? date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
-      const auth = p.authors
-        ? p.authors.split(',').slice(0, 3).join(', ') + (p.authors.split(',').length > 3 ? ' et al.' : '')
-        : '';
+      const auth = shortAuthors(p);
       const citation = escHtml(buildCitation(p));
 
-      let briefHtml;
-      if (noAbstractIds.has(p.id)) {
-        // No abstract — show placeholder, no bullets
-        briefHtml = `<p class="no-abstract-note">No abstract available — brief not generated.</p>`;
-      } else {
-        const rawBrief   = briefById[p.id] || '';
-        const bulletLines = rawBrief.split('\n')
-          .map(l => l.trim())
-          .filter(l => l.startsWith('-') || l.startsWith('•'))
-          .map(l => l.replace(/^[-•]\s*/, ''));
-        briefHtml = bulletLines.length
-          ? `<ul class="brief-bullets">${bulletLines.map(l => `<li>${escHtml(l)}</li>`).join('')}</ul>`
-          : `<p style="font-size:0.87rem;color:var(--text2);font-style:italic">${escHtml(rawBrief || '(brief not generated)')}</p>`;
-      }
-
-      return `<div class="card">
+      return `<div class="card" id="ref-${i + 1}">
   <div class="card-header">
+    <span class="ref-num">[${i + 1}]</span>
     <span class="score-badge ${scoreClass(p.score)}">${p.score}</span>
     <div class="card-title">${titleHtml}</div>
   </div>
   <div class="card-meta">${escHtml(p.journal)}${mo ? ' &middot; ' + escHtml(mo) : ''}${auth ? ' &middot; ' + escHtml(auth) : ''}</div>
-  <div class="card-brief">${briefHtml}</div>
-  ${!noAbstractIds.has(p.id) ? `<details><summary>Abstract</summary><p class="abstract">${escHtml(p.abstract)}</p></details>` : ''}
+  ${noAbstractIds.has(p.id)
+    ? `<p class="no-abstract-note">No abstract available &mdash; this paper was not sent to the model, so the brief above does not cite it.</p>`
+    : `<details><summary>Abstract</summary><p class="abstract">${escHtml(p.abstract)}</p></details>`}
   <div class="card-actions"><button class="copy-cite-btn" data-citation="${citation}">Citation</button></div>
 </div>`;
     }).join('\n');
@@ -5663,23 +5891,35 @@ ${pageIcon()}
   .wm-sub{font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text2);font-style:normal;vertical-align:middle;margin-left:0.4rem}
   .dateline{font-size:0.78rem;color:var(--text2)}
   .notice{font-size:0.8rem;color:var(--amber-text);background:color-mix(in srgb, var(--amber) 9%, transparent);border:1px solid color-mix(in srgb, var(--amber) 25%, transparent);border-radius:var(--radius-sm);padding:0.5rem 0.8rem;margin-bottom:1.5rem}
+  .synthesis{margin-bottom:2.6rem}
+  .theme{font-size:0.8rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text2);margin:1.9rem 0 0.7rem;padding-bottom:0.3rem;border-bottom:1px solid var(--border)}
+  .synthesis > .theme:first-child{margin-top:0}
+  .theme-bullets{margin:0 0 1rem;padding-left:1.1rem;list-style:disc}
+  .theme-bullets li{font-size:0.9rem;line-height:1.65;color:var(--text);margin-bottom:0.45rem}
+  .theme-bullets li:last-child{margin-bottom:0}
+  .theme-para{font-size:0.9rem;line-height:1.65;color:var(--text);margin:0 0 0.8rem}
+  .cite{color:var(--accent);text-decoration:none;font-weight:600;font-size:0.82em;vertical-align:0.15em}
+  .cite:hover{text-decoration:underline}
+  /* The theme headings are the brief; References is apparatus. Both were
+     uppercase over a rule, so References read as a fourth theme. It takes the
+     wordmark's own sub-label treatment instead — smaller, lighter, wider — and
+     its rule sits above it, closing the brief rather than opening a section. */
+  .refs-head{font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin:0 0 1.1rem;padding-top:1rem;border-top:2px solid var(--text)}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.3rem;margin-bottom:1rem}
+  .card:target{border-color:var(--accent)}
   .card-header{display:flex;gap:0.75rem;align-items:flex-start;margin-bottom:0.3rem}
+  .ref-num{font-size:0.8rem;font-weight:700;color:var(--text3);min-width:1.9rem;padding-top:0.15rem}
 ${PAGE_SCORE_CSS}
   .card-title{font-size:0.95rem;font-weight:600;line-height:1.4;color:var(--text)}
   .card-title a{color:var(--accent);text-decoration:none}
   .card-title a:hover{text-decoration:underline}
-  .card-meta{font-size:0.75rem;color:var(--text2);margin-bottom:0.5rem;padding-left:2.2rem}
-  .card-brief{padding-left:2.2rem;margin-bottom:0.3rem}
-  .brief-bullets{margin:0;padding-left:1rem;list-style:disc}
-  .brief-bullets li{font-size:0.87rem;line-height:1.6;color:var(--text);margin-bottom:0.3rem}
-  .brief-bullets li:last-child{color:var(--text);margin-bottom:0}
-  .no-abstract-note{font-size:0.83rem;color:var(--text3);font-style:italic;margin:0.2rem 0 0.3rem}
-  details{padding-left:2.2rem;margin-top:0.5rem}
+  .card-meta{font-size:0.75rem;color:var(--text2);margin-bottom:0.5rem;padding-left:4.85rem}
+  .no-abstract-note{font-size:0.83rem;color:var(--text3);font-style:italic;margin:0.2rem 0 0.3rem;padding-left:4.85rem}
+  details{padding-left:4.85rem;margin-top:0.5rem}
   summary{cursor:pointer;font-size:0.78rem;color:var(--text2)}
   .abstract{font-size:0.83rem;line-height:1.6;color:var(--text);margin:0.4rem 0 0}
   .dl-btn{position:fixed;top:1rem;right:1rem;background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--radius-sm);padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.25)}
-  .card-actions{padding-left:2.2rem;margin-top:0.5rem}
+  .card-actions{padding-left:4.85rem;margin-top:0.5rem}
   .copy-cite-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 10px;font-size:0.75rem;color:var(--text2);cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s}
   .copy-cite-btn:hover{background:var(--border)}
   .copy-cite-btn.copied{color:var(--accent);border-color:var(--accent)}
@@ -5691,9 +5931,11 @@ ${PAGE_SCORE_CSS}
 <div class="wrap">
   <div class="masthead">
     <div class="wordmark"><span class="wm-monitor">LitMonitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Research Brief</span></div>
-    <div class="dateline">${timestamp} &middot; ${allCapped.length} papers (${toBrief.length} briefed) &middot; min score ${document.getElementById('min-score').value}</div>
+    <div class="dateline">${timestamp}${coverageStr ? ' &middot; covering ' + escHtml(coverageStr) : ''} &middot; ${allCapped.length} papers (${toBrief.length} read) &middot; min score ${escHtml(minScore)}${searchNote ? ' &middot; search: ' + escHtml(searchNote) : ''}</div>
   </div>
-  ${omitted > 0 ? `<div class="notice">${omitted} additional paper${omitted > 1 ? 's were' : ' was'} shown but not included (brief cap is ${MAX_PAPERS}). Raise your min score to reduce the list.</div>` : ''}
+  ${omitted > 0 ? `<div class="notice">${omitted} additional paper${omitted > 1 ? 's were' : ' was'} shown but not included (brief cap is ${BRIEF_MAX_PAPERS}). Raise your min score to reduce the list.</div>` : ''}
+  <div class="synthesis">${synthesisHtml}</div>
+  <h2 class="refs-head">References</h2>
   ${cards}
   <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
 </div>
@@ -5804,7 +6046,157 @@ document.getElementById('journals-none-btn').addEventListener('click', () => {
   updateJournalCount();
 });
 
-// Clear cache
+// ── SETTINGS BACKUP ──────────────────────────────────────────────────────────
+// There is no server, so localStorage is the only copy of everything the PI
+// typed. A browser that clears site data — Chrome erasing a site on quit, a
+// cleared cache, a second Chrome profile, a downloaded copy opened from a
+// different folder — takes the lot with no warning and nothing to restore from.
+// One file fixes that.
+//
+// Caches are deliberately absent: they are large, they rebuild themselves, and
+// a backup is only useful if it is small enough to email. The API key is absent
+// too, because the Downloads folder is exactly where a secret should not be
+// written; a restore therefore asks for the key again, which is one field.
+const BACKUP_FORMAT = 'litmonitor-settings';
+const BACKUP_KEYS = [
+  'litmonitor_context', 'litmonitor_prioritize', 'litmonitor_methods',
+  'litmonitor_downgrade', 'litmonitor_authors', 'litmonitor_journals',
+  'litmonitor_custom_journals', 'litmonitor_domain_terms', 'litmonitor_days',
+  'litmonitor_minscore', 'litmonitor_haikuthreshold', 'litmonitor_abstractchars',
+  'litmonitor_examples_sent', 'litmonitor_examples', 'litmonitor_starred',
+  'litmonitor_theme'
+];
+
+// `read` is passed in rather than reached for, so this is testable without a
+// browser and cannot pick up a key that is not on the list.
+function buildBackup(read, whenIso, version) {
+  const data = {};
+  BACKUP_KEYS.forEach(k => {
+    const v = read(k);
+    if (v !== null && v !== undefined) data[k] = v;
+  });
+  return { format: BACKUP_FORMAT, version, saved: whenIso, data };
+}
+
+// Throws a sentence the PI can act on rather than returning null. Every failure
+// here is a file a person chose by hand, so saying what is wrong with THAT file
+// matters more than failing quietly.
+function readBackup(text) {
+  let obj;
+  try { obj = JSON.parse(text); }
+  catch(e) { throw new Error('That file is not a LitMonitor backup — it does not read as JSON.'); }
+  if (!obj || obj.format !== BACKUP_FORMAT || !obj.data || typeof obj.data !== 'object') {
+    throw new Error('That file is not a LitMonitor backup.');
+  }
+  // Unknown keys are dropped rather than written: a backup from a later version
+  // must not be able to put arbitrary names into this origin's storage.
+  //
+  // The VALUE has to be a string as well, and this is not belt-and-braces. Every
+  // one of these keys holds a string, and localStorage coerces whatever it is
+  // given — so a hand-edited or corrupted file with `litmonitor_journals: 5`
+  // stores "5", and on the next load `new Set(JSON.parse("5"))` throws inside
+  // loadState's silent catch. The journal checkboxes are then never painted,
+  // they are built checked, and the next save writes every journal back as
+  // selected: the PI's curated selection is gone, on the recovery path, with no
+  // message. Dropping non-strings here is what stops that.
+  const keys = Object.keys(obj.data)
+    .filter(k => BACKUP_KEYS.includes(k) && typeof obj.data[k] === 'string');
+  if (!keys.length) throw new Error('That backup holds no settings to restore.');
+  return { keys, data: obj.data, saved: obj.saved || '', version: obj.version || '' };
+}
+
+function setBackupPanel(wanted) {
+  const panel = document.getElementById('backup-panel');
+  panel.classList.toggle('open', wanted);
+  panel.setAttribute('aria-hidden', String(!wanted));
+  document.getElementById('backup-btn').setAttribute('aria-expanded', String(wanted));
+  // Two panels open at once would split the feed three ways, so opening one
+  // closes the other.
+  if (wanted) setProfilePanel(false);
+}
+
+(function() {
+  const panel = document.getElementById('backup-panel');
+  setBackupPanel(false);
+  document.getElementById('backup-btn').addEventListener('click',
+    () => setBackupPanel(!panel.classList.contains('open')));
+  document.getElementById('backup-close').addEventListener('click', () => setBackupPanel(false));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && panel.classList.contains('open')) setBackupPanel(false);
+  });
+})();
+
+document.getElementById('backup-download-btn').addEventListener('click', () => {
+  const now = new Date();
+  const payload = buildBackup(k => localStorage.getItem(k), now.toISOString(), VERSION);
+  // readBackup refuses a file with nothing in it, so writing one would hand the
+  // PI a file that fails at the moment it is needed. Refuse at the near end.
+  if (!Object.keys(payload.data).length) {
+    showError('There is nothing to back up yet — fill in your research profile and pick your journals first.');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `litmonitor-settings-${now.toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  showNotice('Settings saved to your Downloads folder. Your API key is not in the file, so it is safe to email — you will re-enter the key after restoring.');
+});
+
+document.getElementById('restore-btn').addEventListener('click', () => {
+  document.getElementById('restore-file').click();
+});
+
+document.getElementById('restore-file').addEventListener('change', ev => {
+  const file = ev.target.files && ev.target.files[0];
+  // The picker keeps the last file selected, so choosing the same file twice in
+  // a row would otherwise fire no change event the second time.
+  ev.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => showError('That file could not be read.');
+  reader.onload = () => {
+    let parsed;
+    try { parsed = readBackup(String(reader.result)); }
+    catch(e) { showError(e.message); return; }
+    const when = parsed.saved ? parsed.saved.split('T')[0] : 'an unknown date';
+    if (!confirm(`Restore the settings backed up on ${when}?\n\n`
+      + `This replaces your research profile, journal selection, fetch settings, `
+      + `starred papers and learned examples with what the file holds.\n\n`
+      + `Your API key and your cached scores are left alone.`)) return;
+    // Written straight through rather than via saveSettings, because the fields
+    // on screen still hold the OLD values; the reload below is what puts the
+    // restored ones into every control at once.
+    //
+    // Every backed-up key is settled, not just the ones the file carries: a key
+    // the file omits is removed. Writing only what is present would MERGE the
+    // file into what is already here, which is not what "replaces" promises —
+    // restoring a backup taken before you had starred anything would have left
+    // today's stars in place.
+    // Removals run first, then writes. Interleaved, a restore that is tight on
+    // quota could fail on litmonitor_starred — much the largest entry, and near
+    // the end of the list — while a removal further down would have freed the
+    // room it needed.
+    const failed = [];
+    BACKUP_KEYS.forEach(k => { if (!parsed.keys.includes(k)) localStorage.removeItem(k); });
+    parsed.keys.forEach(k => { if (!lsSet(k, parsed.data[k])) failed.push(k); });
+    // A reload would wipe lsSet's own message off the screen and reset the
+    // storage-full flag, so a restore that dropped half the file would look
+    // exactly like one that worked.
+    if (failed.length) {
+      showError(`Browser storage is full, so ${failed.length} of ${parsed.keys.length} settings could not be restored `
+        + `(${failed.map(k => k.replace('litmonitor_', '')).join(', ')}). Use "Clear cache" to free space, then restore again. `
+        + `The page has deliberately not been reloaded.`);
+      return;
+    }
+    location.reload();
+  };
+  reader.readAsText(file);
+});
+
 document.getElementById('clear-cache-btn').addEventListener('click', () => {
   if (confirm('Clear all caches?\n\n\u2022 The current feed is cleared and every paper is re-scored on the next run.\n\u2022 Dismissed papers reappear.\n\u2022 Starred papers and learned examples are kept.')) {
     seenIds.clear();
@@ -6094,7 +6486,9 @@ ${pageIcon()}
     <h2>8. Reading Results</h2>
 
     <h3>The left rail</h3>
-    <p>From the top: <span class="ui-label">${railIcon('brief-btn')}Research Brief</span> and <span class="ui-label">${railIcon('export-btn')}Export</span>, which act on the papers currently shown and say how many in their hover text. At the foot: <span class="ui-label">${railIcon('profile-btn')}Research profile</span>, the theme control, and <span class="ui-label">${railIcon('docs-btn')}Documentation</span>. Hovering any of them names it.</p>
+    <p>From the top: <span class="ui-label">${railIcon('brief-btn')}Research Brief</span> and <span class="ui-label">${railIcon('export-btn')}Export</span>, which act on the papers currently shown and say how many in their hover text. At the foot: <span class="ui-label">${railIcon('profile-btn')}Research profile</span>, the theme control, <span class="ui-label">${railIcon('docs-btn')}Documentation</span>, and <span class="ui-label">${railIcon('backup-btn')}Back up &amp; restore</span>. Hovering any of them names it.</p>
+
+    <p><strong>Back up &amp; restore.</strong> Everything you type lives in this browser and nowhere else, so a browser set to clear cookies and site data when it closes erases your profile, journals and settings with no warning and no way back. <span class="ui-label">${railIcon('backup-btn')}Back up &amp; restore</span> writes one small file holding your research profile, journal selection, fetch settings, starred papers and learned examples; restoring reads it back and reloads. Your API key is deliberately not in the file, so it is safe to email, and you re-enter the key after restoring. Cached scores are not in it either &mdash; they rebuild themselves on the next run.</p>
     <h3>Messages</h3>
     <p>Warnings and notices appear above the cards. Each carries a <strong>&times;</strong> that dismisses it; a later run reports again if it still applies.</p>
 
@@ -6140,12 +6534,14 @@ ${pageIcon()}
   <!-- 11. BRIEF -->
   <div class="doc-section" id="brief">
     <h2>11. Research Brief</h2>
-    <p>The <span class="ui-label" title="Costs one Sonnet call">${railIcon('brief-btn')}Research Brief</span> button asks Sonnet for two or three bullets on each shown paper &mdash; up to <strong>50</strong> per run, in one call. Papers beyond 50 are omitted and a notice says so.</p>
-    <p><strong>Bullet 1</strong> — What is interesting, innovative, or important about this specific paper: a concrete finding, method advance, or result that sets it apart from generic topic descriptions.</p>
-    <p><strong>Bullet 2 (and optionally 3)</strong> — Why it matters to <em>you specifically</em>, based on your research profile, and any notable caveats or connections to your work.</p>
-    <p>Papers without an abstract are included in the brief output but show <em>No abstract available — brief not generated.</em> in place of bullets. No API call is made for those papers.</p>
+    <p>The <span class="ui-label" title="Costs one Sonnet call">${railIcon('brief-btn')}Research Brief</span> button asks Sonnet to read every shown paper at once &mdash; up to <strong>75</strong> per run, in one call &mdash; and write a single 700&ndash;900 word synthesis of the set. Papers beyond 75 are omitted and a notice says so; the ones kept are the highest-scoring, in the starred view too.</p>
+    <p><strong>Themes</strong> — Sonnet groups the set into three to six themes that come out of the papers themselves, and writes two to five bullets under each. A bullet names the method, the number, and what is new, and cites its papers by index.</p>
+    <p><strong>Emerging Signals</strong> — A closing section of three to five bullets on what cuts across the themes: patterns, results that contradict each other or the field, and gaps worth watching. This is the part that a paper-by-paper reading cannot give you.</p>
+    <p><strong>References</strong> — Every shown paper is listed below the synthesis, numbered to match the citations, with its score, its link, its abstract and its Citation button. Clicking a citation jumps to it.</p>
+    <p>The brief is written against your research profile, and the relevance reason Sonnet gave each paper during scoring is handed back to it, so coverage follows the scores: a 9 or a 10 earns its own bullet and a paper near your threshold is mentioned only if it adds something.</p>
+    <p>The brief works on whatever is <em>currently shown</em>. In the starred view it briefs your starred papers only; otherwise it briefs what survives the filter, the min score and the search. Papers without an abstract are listed in the references and marked, but are not sent to Sonnet and are not cited.</p>
     <p>The brief opens in a new tab and can be downloaded as a self-contained HTML file. Like Export, it mirrors the current app theme.</p>
-    <div class="tip"><strong>Cost note:</strong> one Sonnet call per brief, however many papers are in it &mdash; and only papers with an abstract are sent.</div>
+    <div class="tip"><strong>Cost note:</strong> one Sonnet call per brief, however many papers are in it &mdash; and only papers with an abstract are sent. Full abstracts go into the call, so a brief at the full 75-paper cap costs roughly <strong>$0.11</strong>; a typical brief of a dozen papers is under two cents.</div>
   </div>
 
   <!-- 12. TIPS -->

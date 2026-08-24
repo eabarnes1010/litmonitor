@@ -16,7 +16,7 @@ On a first visit the app opens the API key section and the profile panel, and th
 
 1. **API key.** Get one at [console.anthropic.com](https://console.anthropic.com) and paste it into **LLM API key** in the sidebar. Costs bill to your own key.
 2. **Profile.** Open **Research profile** from the left rail and fill in at least *Prioritize* or *Transferable methods*. Specific beats broad: "AI emulators for climate model parameterizations" works, "machine learning" does not.
-3. **Journals.** Open **Select journals** and pick your sources. All are on by default.
+3. **Journals.** Open **Select journals** and pick your sources. All are on by default on a first run; a journal added in a later release arrives switched off, so check the list after an update.
 4. **Fetch.** Click **↓ Fetch & Score**.
 
 Expect roughly **$0.10–0.12 per 100 papers**.
@@ -25,11 +25,25 @@ Expect roughly **$0.10–0.12 per 100 papers**.
 
 ## The interface
 
-**Left rail**, top to bottom: **Brief** and **Export**; at the foot, **Research profile**, the theme control and **Documentation**. Hover any of them for its name. The sidebar hides from a button on its own edge, not from the rail.
+**Left rail**, top to bottom: **Brief** and **Export**; at the foot, **Research profile**, the theme control, **Documentation** and **Back up & restore**. Hover any of them for its name. The sidebar hides from a button on its own edge, not from the rail.
 
 **Sidebar**: everything that changes the next run — fetch settings, journals, custom sources, API key — with **Cost estimate** and **Clear cache** at the bottom. Its top section does not scroll, so **Fetch & Score** and the status line stay in reach.
 
 **Profile panel**: opens from the rail and narrows the feed. `Esc` closes it.
+
+**Back up & restore panel**: opens from the archive-box button at the foot of the rail.
+
+---
+
+## Back up your settings
+
+Everything you type lives in your browser and nowhere else. A browser set to clear cookies and site data when it closes will erase your research profile, journal selection and settings without asking, and there is no server copy to fall back on. This has already happened to a user.
+
+**Back up settings to a file** writes one small JSON file holding your research profile, journal selection, custom journals, fetch settings, starred papers and learned examples. Your **API key is deliberately not in the file**, so it is safe to email, and the score caches are left out because they rebuild themselves.
+
+**Restore from a file** reads that file back, replaces what is in the browser now, and reloads. A setting the file does not carry is cleared rather than left behind, so a restore returns you to exactly the state you backed up. Your API key and your cached scores are untouched, so re-enter the key after restoring.
+
+Take a backup once your profile is set, and again whenever you change it.
 
 ---
 
@@ -105,7 +119,7 @@ The title is the link to the paper.
 
 The starred view ignores the score floor and the dismissed list; the floor is greyed out there. A star keeps the whole paper, abstract included, so it still reads properly months later — papers starred before v3.6 kept a shortened abstract, and re-starring one rewrites it.
 
-**Export** opens a report of whatever is shown, downloadable as one self-contained file. **Brief** asks Sonnet for two or three bullets per paper — what is interesting, and why it matters to you — for up to 50 papers in a single call. Both act on the papers currently shown; hover them for the count.
+**Export** opens a report of whatever is shown, downloadable as one self-contained file. **Brief** asks Sonnet to read everything shown in one call — up to 75 papers, the highest-scoring if there are more — and write one 700–900 word synthesis of the set: three to six themes drawn from the papers themselves, each bullet citing its papers by number, closing with **Emerging Signals** on what cuts across them, contradicts, or is missing. A numbered reference list of every shown paper sits below it, and a citation jumps to its entry. Both act on the papers currently shown; hover them for the count.
 
 ---
 
