@@ -84,7 +84,7 @@ On each card the left column carries the score badge, journal and date:
 
 A **ring around the badge** means the paper is new since your last run.
 
-The **abstract** sits under the authors, four lines deep. It starts at the paper's finding rather than its opening background; a leading `…` marks where it skipped. **Show more**, or a click anywhere on the card, opens the whole thing. **Score reasoning** below it is Claude's one-sentence justification, and the best guide to tuning your profile.
+The **abstract** sits under the authors, four lines deep. It starts at the paper's finding rather than its opening background; a leading `…` marks where it skipped. **Show more**, or a click anywhere on the card, opens the whole thing; it is not shown when the preview is already the whole abstract. **Score reasoning** below it is Claude's one-sentence justification, and the best guide to tuning your profile.
 
 | Action | Effect |
 | --- | --- |
@@ -103,7 +103,7 @@ The title is the link to the paper.
 
 **All** / **New only** / **Score ≥ N** (default 6) / **★ Starred**, and a search box matching title and author.
 
-The starred view ignores the score floor and the dismissed list; the floor is greyed out there.
+The starred view ignores the score floor and the dismissed list; the floor is greyed out there. A star keeps the whole paper, abstract included, so it still reads properly months later — papers starred before v3.6 kept a shortened abstract, and re-starring one rewrites it.
 
 **Export** opens a report of whatever is shown, downloadable as one self-contained file. **Brief** asks Sonnet for two or three bullets per paper — what is interesting, and why it matters to you — for up to 50 papers in a single call. Both act on the papers currently shown; hover them for the count.
 

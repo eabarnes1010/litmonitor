@@ -1680,7 +1680,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.5';
+const VERSION = 'v3.6';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -2183,6 +2183,12 @@ function saveScoreCache() {
 // restored on load. Abstracts dominate the payload, so a quota failure is retried
 // once with abstracts truncated before the write is reported as failed.
 const FEED_ABSTRACT_CAP = 800;
+// A star is a keepsake, and reading a truncated abstract months later is the
+// thing it exists to prevent, so a starred paper keeps its abstract whole.
+// This is the width to fall back to if the browser refuses the write for space
+// — the same shape saveFeed() already uses. Measured on 98 recent papers:
+// median 1,638 characters, p90 2,126, longest 2,270.
+const STAR_ABSTRACT_CAP = 2500;
 
 function saveFeed() {
   const pack = list => JSON.stringify({
@@ -2668,7 +2674,7 @@ const MAX_STARRED = 500;
 function starSnapshot(p) {
   return {
     id: p.id, title: p.title, authors: p.authors,
-    abstract: (p.abstract || '').slice(0, FEED_ABSTRACT_CAP),
+    abstract: p.abstract || '',
     link: p.link, journal: p.journal, preprint: !!p.preprint,
     priorityAuthor: !!p.priorityAuthor,
     score: p.score, reason: p.reason,
@@ -2697,7 +2703,14 @@ function capStarred(store) {
 
 function saveStarred() {
   starred = capStarred(starred);
-  lsSet('litmonitor_starred', JSON.stringify(starred));
+  if (lsSet('litmonitor_starred', JSON.stringify(starred), true)) return;
+  // Only when the browser says there is no room: the abstracts are what make
+  // this store big, so they are what gives way, rather than losing a star.
+  const trimmed = {};
+  Object.entries(starred).forEach(([id, p]) => {
+    trimmed[id] = { ...p, abstract: (p.abstract || '').slice(0, STAR_ABSTRACT_CAP) };
+  });
+  lsSet('litmonitor_starred', JSON.stringify(trimmed));
 }
 
 // ── CUSTOM JOURNALS ───────────────────────────────────────────────────────────
@@ -2927,24 +2940,38 @@ function loadArxivCovered() {
   } catch(e) { return {}; }
 }
 
-function markArxivCovered(cat, papers) {
-  // The newest submission in the answer. Papers older than that are ours; the
-  // ground between it and now is what the next run still has to ask for.
+// Coverage is an interval, not a point: `from` is the earliest date a
+// successful query has asked for, `to` the newest submission one has returned.
+// Storing only `to` made "Fetch days back" a lie for arXiv — widening the
+// window from 2 days to 14 left the start clipped to a recent date, so the
+// twelve older days were never asked for and the setting silently did nothing.
+function markArxivCovered(cat, start, papers) {
   const newest = papers.reduce((max, p) => {
     const t = p.date instanceof Date ? p.date.getTime() : Date.parse(p.date);
     return isFinite(t) && t > max ? t : max;
   }, 0);
   if (!newest) return;                       // an empty window covers nothing
   const covered = loadArxivCovered();
-  covered[cat] = new Date(newest).toISOString();
+  const prev = covered[cat] || {};
+  const prevFrom = Date.parse(prev.from);
+  covered[cat] = {
+    from: new Date(isFinite(prevFrom) ? Math.min(prevFrom, start.getTime()) : start.getTime()).toISOString(),
+    to: new Date(Math.max(newest, Date.parse(prev.to) || 0)).toISOString()
+  };
   lsSet(ARXIV_COVERED_KEY, JSON.stringify(covered), true);
 }
 
-// The window actually worth asking for: never earlier than the user's cutoff,
-// never re-covering ground a previous successful query already covered.
+// The window actually worth asking for. Asking for days before anything has
+// been covered means the whole window is new ground, so the cutoff stands —
+// which is what makes a widened "Fetch days back" do what it says. Otherwise
+// the old days are already in hand and only the recent end is missing.
 function arxivWindowStart(cat, cutoff, covered) {
-  const seen = covered[cat] ? new Date(covered[cat]) : null;
-  return (seen && !isNaN(seen) && seen > cutoff) ? seen : cutoff;
+  const rec = covered[cat];
+  const from = rec && Date.parse(rec.from);
+  const to   = rec && Date.parse(rec.to);
+  if (!isFinite(from) || !isFinite(to)) return cutoff;   // nothing covered yet
+  if (cutoff.getTime() < from) return cutoff;            // asking further back than we hold
+  return new Date(Math.max(to, cutoff.getTime()));
 }
 let arxivNextSlot = 0;
 
@@ -3040,7 +3067,7 @@ async function fetchArxivBoth(j, cat, cutoff, fetchErrors, partialNotes) {
       add(api.papers);
       // Only a complete answer counts as covered; a capped one left its oldest
       // papers behind, and those days must stay askable.
-      if (!api.capped) markArxivCovered(cat, api.papers);
+      if (!api.capped) markArxivCovered(cat, start, api.papers);
       if (api.capped) {
         partialNotes.push({ source: j.name,
           reason: `more papers in that window than a run fetches (${api.total} against ${ARXIV_API_PAGES * ARXIV_API_MAX})` });
@@ -4192,6 +4219,22 @@ function renderPapers() {
 
   container.querySelectorAll('.abstract-btn').forEach(btn => {
     btn.addEventListener('click', () => toggleAbstract(btn.closest('.paper-card')));
+  });
+
+  // A disclosure with nothing behind it is worse than no disclosure: clicking it
+  // appeared to do nothing at all. That is the normal case in the starred view,
+  // where the stored abstract is capped at STAR_ABSTRACT_CAP characters and four
+  // lines of a full-width card can hold all of them, and it happens on any card
+  // whose abstract is short. Measured after layout rather than guessed from the
+  // text, because how much fits depends on the window's width.
+  container.querySelectorAll('.card-abstract').forEach(block => {
+    const lede = block.querySelector('.abstract-lede');
+    const rest = block.querySelector('.abstract-rest');
+    const btn  = block.querySelector('.abstract-btn');
+    if (!lede || !rest || !btn) return;
+    const clipped = (lede.scrollHeight || 0) - (lede.clientHeight || 0) > 2;
+    const skipped = (rest.textContent || '').length > (lede.textContent || '').length;
+    if (!clipped && !skipped) btn.style.display = 'none';
   });
 
   // Clicking the card itself expands it too, which is the ordinary behaviour
