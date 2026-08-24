@@ -122,14 +122,12 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 14px 0 18px;
+    padding: 19px 0 18px;
     position: sticky;
     top: 0;
     height: 100vh;
     z-index: 50;
   }
-  .rail-mark { width: 30px; height: 30px; margin-bottom: 12px; }
-  .rail-mark svg { display: block; width: 100%; height: 100%; }
   .rail-btn {
     width: 38px;
     height: 38px;
@@ -160,13 +158,25 @@
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
   }
+  /* The tile is what makes the mark the mark, so it keeps it. Three things
+     stop it reading as a sixth button: it is 24px against their 38px, it has no
+     hover state at all, and a rule separates it from them. */
+  .rail-mark {
+    width: 24px;
+    height: 24px;
+    margin: 0 0 6px;
+    flex-shrink: 0;
+  }
+  .rail-mark svg { display: block; width: 100%; height: 100%; }
+
   .rail-spacer { margin-top: auto; }
   /* The collapse governs the column beside it; Export and Brief act on the
      feed. Four buttons in a row read as a pile, so a rule says which is which. */
-  /* --border2 is 1.48:1 on the rail's surface: present in the DOM and in the
-     test, invisible on screen. A rule that carries the grouping has to clear
-     1.4.11's 3:1, which --text3 does at 4.76:1. */
-  .rail-sep { width: 22px; height: 1px; background: var(--text3); opacity: 0.55; margin: 7px 0; flex-shrink: 0; }
+  /* One rule, below the mark, where it does what a rule is for: it separates
+     the identity from the controls, two groups of one and five. The pair that
+     used to bracket the sidebar toggle is gone — a rule around a single item
+     delimits nothing. */
+  .rail-sep { width: 22px; height: 1px; background: var(--border2); margin: 0 0 10px; flex-shrink: 0; }
 
   /* ── Sidebar ── */
   #sidebar {
@@ -183,6 +193,7 @@
   }
   .sidebar-head {
     flex-shrink: 0;
+    min-width: 0;
     padding: 18px 18px 16px;
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -207,7 +218,10 @@
     border-right-width: 0;
     overflow: hidden;
   }
-  #sidebar.hidden + #sidebar-resizer { display: none; }
+  /* The divider stays when the sidebar goes: it is what carries the control
+     that brings it back. It just stops being a drag handle. */
+  #sidebar.hidden + #sidebar-resizer { cursor: default; }
+  #sidebar.hidden + #sidebar-resizer:hover { background: transparent; }
 
   #sidebar-resizer {
     width: 5px;
@@ -216,22 +230,58 @@
     background: transparent;
     transition: background 0.15s;
     z-index: 10;
+    position: relative;
   }
+  /* A panel toggle belongs on the panel's edge rather than in a rail of things
+     that act on the papers — the convention Notion, Linear and Obsidian all
+     follow. Sitting on the divider, it tracks the sidebar's width for free. */
+  #sidebar-toggle-btn {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--border2);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text3);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  #sidebar-toggle-btn svg { width: 13px; height: 13px; }
+  #sidebar-toggle-btn:hover { color: var(--accent); border-color: var(--accent); }
+  #sidebar-toggle-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   #sidebar-resizer:hover, #sidebar-resizer.dragging {
     background: color-mix(in srgb, var(--accent) 35%, transparent);
   }
 
   .logo { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+  .sidebar-head .logo { margin-bottom: 8px; }   /* 12px gap + 8px = the 20px used everywhere else */
   .logo span { color: var(--accent); font-style: italic; }
 
+  /* It was nowrap with an ellipsis, which is right for a wide header and wrong
+     for a 300px column: everything after the timestamp was cut. It wraps to at
+     most three lines instead, and the tooltip carries the whole of it. */
   #status-line {
     font-size: 11.5px;
+    line-height: 1.45;
     color: var(--text3);
     min-width: 0;
     max-width: 100%;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    /* No max-height: the clamp already stops it at three lines, and an explicit
+       three-line-box height rounds down often enough to shave the descenders
+       off the third line. */
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
   .head-actions { display: flex; gap: 8px; }
 
@@ -351,6 +401,8 @@
     flex-direction: column;
     border-bottom: 1px solid var(--border);
   }
+  /* The scrolling middle ends where the foot's own border begins. */
+  .sidebar-body > .accordion:last-child { border-bottom: none; }
   /* The whole row is the target, not the glyph: the chevron alone was a ~10px
      square and had to be hit exactly. */
   .group-toggle {
@@ -447,6 +499,7 @@
   .slider-label { font-size: 12.5px; color: var(--text2); }
   .slider-badge {
     min-width: 42px;
+    flex: 0 0 auto;
     text-align: center;
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -457,6 +510,57 @@
     color: var(--text);
     font-variant-numeric: tabular-nums;
   }
+  /* The typed twin of a slider badge: the same box, drawn from the same rules,
+     at one fixed width. Typed, not stepped — the spinner arrows are removed,
+     because they appear on hover in some browsers and disappear in others, so
+     the row's width would depend on where the pointer was. */
+  .slider-num {
+    width: 54px;
+    min-width: 54px;
+    flex: 0 0 54px;
+    height: 24px;
+    text-align: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 2px 4px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  .slider-num::-webkit-outer-spin-button,
+  .slider-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .slider-num:disabled, .slider:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* A settings row whose control is the value itself rather than a track. The
+     select is drawn as a slider badge is — same fill, radius, weight and
+     height — so a section holding both still reads as one family, and it is
+     sized to its widest option so choosing one does not move the row. */
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .setting-label { font-size: 12.5px; color: var(--text2); }
+  .setting-row select {
+    width: 68px;
+    min-width: 0;
+    height: 30px;
+    padding: 2px 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    text-align-last: center;
+    flex-shrink: 0;
+  }
+
   .slider {
     width: 100%;
     accent-color: var(--accent);
@@ -464,17 +568,6 @@
     margin: 0;
   }
   .slider:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  /* Hidden from sight and from the tab order, but still in the DOM and still
-     the value every other line of code reads. */
-  .slider-source {
-    position: absolute;
-    width: 1px; height: 1px;
-    padding: 0; margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-  }
 
   /* A binary that changes what the next run does is a checkbox, not a button
      that looks pressed: a toggle button is for immediate view state. */
@@ -492,18 +585,54 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  .check-label { font-size: 12.5px; font-weight: 500; color: var(--text); }
+  .check-label { font-size: 12.5px; font-weight: 500; line-height: 1.3; color: var(--text); }
+  /* One flex child, so .group-content's 20px gap falls outside the pair rather
+     than between the checkbox and the line explaining it. */
+  .check-block { display: flex; flex-direction: column; }
   .check-hint { margin-top: 5px; }
   /* Dimmed and disabled rather than hidden: the setting still has to be visible
-     for the reader to know what the checkbox above it controls. */
-  .dependent {
-    margin-left: 24px;
-    padding-left: 12px;
-    border-left: 2px solid var(--border);
-    transition: opacity 0.15s;
-  }
+     for the reader to know what the checkbox controls. It used to be indented
+     under that checkbox; the checkbox is outside the fold now, so an indent
+     would be measured against nothing. */
+  .dependent { transition: opacity 0.15s; }
   .dependent.disabled { opacity: 0.42; }
   .dependent.disabled .slider { cursor: not-allowed; }
+
+  /* A second disclosure inside a section that is itself a disclosure, drawn so
+     it cannot be mistaken for another of the same kind: no icon, no hover fill,
+     no full-width hit area, and a caret a third the size of the section
+     chevrons. What is behind it is set once and then left alone — the Haiku
+     threshold and how much of each abstract is sent — while what stays out is
+     the one setting that changes run to run. */
+  .advanced { margin-top: -6px; }
+  .advanced > summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 0;
+    font-size: 11.5px;
+    color: var(--text3);
+    cursor: pointer;
+    width: fit-content;
+  }
+  .advanced > summary::-webkit-details-marker { display: none; }
+  .advanced > summary::before {
+    content: '';
+    width: 0; height: 0;
+    border-left: 4px solid currentColor;
+    border-top: 3.5px solid transparent;
+    border-bottom: 3.5px solid transparent;
+    transition: transform 0.18s ease;
+  }
+  .advanced[open] > summary::before { transform: rotate(90deg) translateX(1px); }
+  .advanced > summary:hover { color: var(--accent); }
+  .advanced > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Tight to the summary, the way the prefilter hint is tight to its checkbox,
+     then the section's own 20px before the first control. */
+  .advanced[open] > summary { margin-bottom: 5px; }
+  .adv-hint { margin: 0 0 20px; }
+  .advanced-body { display: flex; flex-direction: column; gap: 20px; }
 
   /* Stop is transient and narrow; it stays a chip. */
   .toggle-chip {
@@ -516,7 +645,16 @@
 
   .section-actions { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 6px; }
 
-  .sidebar-foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); }
+  /* Pinned, like the head. Spend is a readout worth keeping in sight, and a
+     column that scrolls off into the viewport edge has no bottom to it. */
+  .sidebar-foot {
+    flex-shrink: 0;
+    padding: 12px 18px 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
   /* Read-only: the rates behind these figures are shipped constants, not a
      setting. It reads from the stored month total rather than the run, so the
      number is there on a fresh load and not only after a fetch. */
@@ -543,6 +681,7 @@
     align-items: center;
     gap: 9px;
     padding: 6px 8px;
+    margin: 0 -8px;
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background 0.1s;
@@ -555,18 +694,18 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  .journal-name { font-size: 12.5px; color: var(--text2); flex: 1; }
+  .journal-name { font-size: 12.5px; line-height: 1.3; color: var(--text2); flex: 1; }
   .journal-item.checked .journal-name { color: var(--text); font-weight: 500; }
 
   /* source badge in journal list */
   .journal-source {
     font-size: 9.5px;
+    line-height: 1.3;
     color: var(--text3);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     flex-shrink: 0;
   }
-  .journal-source.direct { color: var(--accent); }
 
   /* API key */
   .key-row { position: relative; }
@@ -886,6 +1025,12 @@
     color: var(--text);
     margin-bottom: 5px;
   }
+  /* Nothing at rest, underlined on hover — what a card headline does everywhere
+     from a news front page to a repository listing. The arrow that used to sit
+     here marked an exception that does not exist, since every title opens a
+     paper in a new tab, and a permanent underline read as clutter on a page of
+     stacked cards. Size, weight and position are what say "this is the paper";
+     the whole card is clickable anyway, so a touch user is not stranded. */
   .paper-title a {
     color: inherit;
     text-decoration: none;
@@ -896,9 +1041,6 @@
     color: var(--accent);
     border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent);
   }
-  /* The Open button duplicated this link and was removed, so the affordance has
-     to be visible on the title itself. */
-  .paper-title .ext { font-size: 11px; color: var(--text3); margin-left: 5px; }
 
   .paper-authors {
     font-size: 12.5px;
@@ -1018,9 +1160,14 @@
   }
 
   /* ── Empty / loading states ── */
+  /* A column, not a page. 340px is about 45 characters at this size, which is
+     the width a numbered step can hold without wrapping — and a step that wraps
+     is what made this read as ragged rather than as a list. */
   #empty-state {
+    max-width: 380px;
+    margin: 0 auto;
     text-align: center;
-    padding: 72px 40px;
+    padding: 64px 20px;
     color: var(--text3);
   }
   #empty-state .big {
@@ -1032,18 +1179,21 @@
   }
   /* #empty-body was a <p> until the first-run steps went into it; the other two
      empty states still write plain text into it, so it keeps the paragraph's
-     measure and type. */
+     type. The measure comes from #empty-state now, so there is one width here
+     rather than three. */
   #empty-state p,
-  #empty-state #empty-body { font-size: 13px; line-height: 1.7; max-width: 420px; margin: 0 auto; color: var(--text2); }
-  /* A first run is the one time the app has to teach itself, so the four steps
-     are numbered and left-aligned rather than run together in a sentence. */
+  #empty-state #empty-body { font-size: 13px; line-height: 1.6; color: var(--text2); }
+  /* A first run is the one time the app has to teach itself. Left-aligned,
+     because a centred list has a ragged left edge and the numbers stop lining
+     up; the block as a whole is still centred in the feed. */
   #empty-state ol {
     display: inline-block; text-align: left;
-    max-width: 420px; margin: 0 auto 14px;
-    padding-left: 20px;
-    font-size: 13px; line-height: 1.8; color: var(--text2);
+    margin: 4px 0 16px;
+    padding-left: 18px;
+    font-size: 13px; line-height: 1.5; color: var(--text2);
   }
-  #empty-state ol li { margin-bottom: 2px; }
+  #empty-state ol li + li { margin-top: 9px; }
+  #empty-state ol li::marker { color: var(--text3); }
   #empty-state .empty-foot { font-size: 12px; color: var(--text3); }
   .link-btn {
     background: none; border: none; padding: 0;
@@ -1127,6 +1277,13 @@
     font-size: 11.5px;
     font-weight: 500;
     line-height: 1.4;
+    /* A tooltip wrapping to two lines with one word on the second is the
+       textbook case for balance: it hands the browser the whole block and asks
+       for lines of roughly equal length rather than filling the first and
+       letting the remainder fall. Browsers balance a handful of lines and then
+       stop, so the long card tips are unharmed, and where it is unsupported the
+       text wraps exactly as it did. */
+    text-wrap: balance;
     box-shadow: var(--shadow-lift);
     pointer-events: none;
     opacity: 0;
@@ -1186,7 +1343,6 @@
       border-right: none;
       border-bottom: 1px solid var(--border);
     }
-    .rail-mark { margin-bottom: 0; margin-right: 8px; }
     .rail-spacer { margin-top: 0; margin-left: auto; }
     #sidebar {
       width: auto !important;
@@ -1205,7 +1361,8 @@
       border-bottom: 1px solid var(--border);
     }
     .panel-head, .panel-body { width: auto; }
-    #sidebar-resizer { display: none; }
+    #sidebar-resizer { width: 100%; height: 0; }
+    #sidebar-toggle-btn { bottom: -11px; left: auto; right: 14px; transform: none; }
     #feed-area { padding: 14px; }
     .stat { padding: 0 14px; }
   }
@@ -1219,14 +1376,13 @@
        unlabelled icon is the wrong affordance for wiping the score cache. -->
   <div id="rail" aria-label="Actions">
     <div class="rail-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--accent)"/><path d="M9 24.5c2.6-4.4 3.6-10.6 6.4-14.2 2.7-3.5 6.3-5.2 10.6-5.3-.3 6.3-3.6 11.2-8.1 13.2-2.9 1.3-6 3.4-8.9 6.3z" fill="var(--on-accent)"/><path d="M24.4 6 10 23.6" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round" fill="none"/><path d="M8 27.4h16" stroke="var(--on-accent)" stroke-width="2" stroke-linecap="round" fill="none"/></svg></div>
-    <button class="rail-btn" data-tip="Hide the sidebar" id="sidebar-toggle-btn" aria-label="Hide the sidebar" aria-expanded="true"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><line x1="10" y1="4" x2="10" y2="20"/></svg></button>
     <div class="rail-sep"></div>
+    <button class="rail-btn" data-tip="Research Brief · costs one Sonnet call" id="brief-btn" aria-label="Research Brief"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><line x1="8.5" y1="12" x2="15" y2="12"/><line x1="8.5" y1="16" x2="15" y2="16"/><line x1="8.5" y1="19" x2="12.5" y2="19"/></svg></button>
     <button class="rail-btn" data-tip="Export shown papers" id="export-btn" aria-label="Export shown papers"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-    <button class="rail-btn" data-tip="Research Brief · costs one Sonnet call" id="brief-btn" aria-label="Research Brief"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg></button>
     <div class="rail-spacer"></div>
     <button class="rail-btn" data-tip="Research profile" id="profile-btn" aria-label="Research profile"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></button>
-    <button class="rail-btn" data-tip="Documentation" id="docs-btn" aria-label="Documentation"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></button>
     <button class="rail-btn" data-tip="Switch theme" id="theme-toggle-btn" aria-label="Switch theme"></button>
+    <button class="rail-btn" data-tip="Documentation" id="docs-btn" aria-label="Documentation"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></button>
   </div>
 
   <!-- Sidebar -->
@@ -1236,7 +1392,7 @@
          reachable however far down the profile you are. -->
     <div class="sidebar-head">
       <div class="logo">LitMonitor <span>Earth</span></div>
-      <button class="btn btn-primary" id="fetch-btn" data-tip="Every new paper costs a Sonnet call, and a Haiku one first if the prefilter is on. The status line reports the total.">&#8595; Fetch &amp; Score</button>
+      <button class="btn btn-primary" id="fetch-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.52 14.74A8 8 0 1 1 18.55 7.41L21.5 9"/><polyline points="21.5 3.8 21.5 9 16.5 9"/></svg>Fetch &amp; Score</button>
       <div class="head-actions">
         <button class="btn btn-ghost toggle-chip" id="stop-btn" style="display:none;border-color:var(--red);color:var(--red)" data-tip="Stop after the batch already in flight. Papers scored so far are kept.">&#9632; Stop</button>
       </div>
@@ -1260,23 +1416,21 @@
 
           <div class="setting-block">
             <div class="slider-row">
-              <span class="slider-label" data-tip="How far back to look. Auto uses the gap since the last successful run, so nothing is missed between runs.">Fetch days back</span>
-              <span class="slider-badge" id="days-back-badge">2</span>
+              <span class="slider-label" data-tip="How far back to look. Auto uses the gap since the last successful run, so nothing is missed between runs; a run where a source failed does not count as successful.">Fetch days back</span>
+              <!-- Deliberately not type="number": that draws spinner arrows,
+                   which some browsers show only on hover, so the row's width
+                   would depend on where the pointer was. maxlength is 2, so the
+                   field can never hold more than the 99 it accepts, and the box
+                   is one width whatever is in it. -->
+              <input type="text" inputmode="numeric" maxlength="4" class="slider-num" id="days-back-num" value="2"
+                     aria-label="Fetch days back, in days"
+                     data-tip="Any value from 1 to 99 days, or Auto to use the gap since the last successful run.">
             </div>
-            <input type="range" class="slider" id="days-back-range" min="0" max="10" step="1" value="2" aria-label="Fetch days back">
-            <select id="days-back" class="slider-source" tabindex="-1" aria-hidden="true">
-            <option value="auto">Auto</option>
-            <option value="1">1</option>
-            <option value="2" selected>2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="7">7</option>
-            <option value="10">10</option>
-            <option value="14">14</option>
-            <option value="21">21</option>
-            <option value="30">30</option>
-            </select>
+            <input type="range" class="slider" id="days-back-range" min="0" max="30" step="1" value="2" aria-label="Fetch days back, zero for automatic">
+            <!-- The single source of truth, and what gets stored: "auto", or a
+                 number of days. Text rather than number, because it has to hold
+                 the word; the controls above are views onto it. -->
+            <input type="text" id="days-back" value="2" hidden>
           </div>
 
           <!-- A persistent setting that changes what the next run does, so a
@@ -1284,44 +1438,49 @@
                for immediate view state. The threshold below it means nothing
                when the prefilter is off, so it is disabled and dimmed rather
                than hidden, which would hide that the setting exists at all. -->
-          <label class="check-row" for="prefilter-toggle">
-            <input type="checkbox" id="prefilter-toggle" checked>
-            <span class="check-label" data-tip="A cheap Haiku pass scores every fetched paper first and drops the clear misses, so Sonnet only sees the rest. Off sends every paper to Sonnet.">Haiku prefilter</span>
-          </label>
-          <div class="hint check-hint">A cheap Haiku pass drops low-scoring papers before Sonnet scores them.</div>
-
-          <div class="setting-block dependent" id="haiku-threshold-block">
-            <div class="slider-row">
-              <span class="slider-label" data-tip="Papers Haiku scores at or below this never reach Sonnet. Higher saves more and risks dropping something Sonnet would have liked.">Drop if Haiku scores &le;</span>
-              <span class="slider-badge" id="haiku-threshold-badge">3</span>
-            </div>
-            <input type="range" class="slider" id="haiku-threshold-range" min="1" max="9" step="1" value="3" aria-label="Haiku drop threshold">
-            <input type="number" id="haiku-threshold" class="slider-source" tabindex="-1" aria-hidden="true" value="3" min="1" max="9">
+          <div class="check-block">
+            <label class="check-row" for="prefilter-toggle">
+              <input type="checkbox" id="prefilter-toggle" checked>
+              <span class="check-label">Haiku prefilter</span>
+            </label>
+            <div class="hint check-hint">A cheaper Haiku pass drops low-scoring papers before Sonnet scores them.</div>
           </div>
 
-          <div class="setting-block">
+          <details class="advanced">
+            <summary>Cost controls</summary>
+            <div class="hint adv-hint">Dropping more with Haiku and sending fewer abstract characters costs less but risks missing articles.</div>
+            <div class="advanced-body">
+            <div class="setting-block dependent" id="haiku-threshold-block">
             <div class="slider-row">
-              <span class="slider-label" data-tip="How much of each abstract is sent for scoring. Unlimited scores best and costs most, felt hardest on the Haiku pass where every fetched paper is sent.">Abstract chars (scoring)</span>
-              <span class="slider-badge" id="abstract-chars-badge">&#8734;</span>
+              <span class="slider-label" data-tip="Papers Haiku scores at or below this never reach Sonnet. Higher saves costs but risks dropping articles.">Drop if Haiku scores &le;</span>
+              <span class="slider-badge" id="haiku-threshold-badge">5</span>
             </div>
-            <input type="range" class="slider" id="abstract-chars-range" min="0" max="5" step="1" value="5" aria-label="Abstract characters sent for scoring">
-            <select id="abstract-chars" class="slider-source" tabindex="-1" aria-hidden="true">
-            <option value="300">300</option>
+            <input type="range" class="slider" id="haiku-threshold-range" min="1" max="9" step="1" value="5" aria-label="Haiku drop threshold">
+            <input type="number" id="haiku-threshold" hidden value="5" min="1" max="9">
+            </div>
+            <div class="setting-row">
+              <span class="setting-label" data-tip="How much of each abstract is sent for scoring. All costs most but produces the best results.">Abstract chars (scoring)</span>
+              <select id="abstract-chars" aria-label="Abstract characters sent for scoring">
             <option value="500">500</option>
-            <option value="800">800</option>
             <option value="1000">1000</option>
             <option value="1500">1500</option>
-            <option value="0" selected>∞</option>
+            <option value="2000">2000</option>
+            <option value="2500">2500</option>
+            <option value="0" selected>All</option>
             </select>
-          </div>
+            </div>
+            </div>
+          </details>
+
+
 
         </div>
       </div>
 
-      <!-- Select Journals -->
+      <!-- Select journals -->
       <div class="accordion">
         <button class="group-toggle" data-accordion="journals-group">
-          <span class="group-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><line x1="8" y1="6.5" x2="16" y2="6.5"/><line x1="8" y1="10" x2="14" y2="10"/></svg> Select Journals <span id="journal-count" class="label-note"></span></span>
+          <span class="group-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="4" height="15" rx="1"/><rect x="8.5" y="6" width="4" height="15" rx="1"/><rect x="14" y="6" width="4" height="15" rx="1" transform="rotate(14 16 13.5)"/><line x1="3" y1="21" x2="21" y2="21"/></svg> Select journals <span id="journal-count" class="label-note"></span></span>
           <span class="toggle-icon"><svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
         </button>
         <div class="group-content" id="journals-group">
@@ -1350,7 +1509,7 @@
           <div class="sidebar-section">
             <label>arXiv.cs filter</label>
             <textarea id="domain-terms-input" rows="4" placeholder="One term per line. Empty means no filtering."></textarea>
-            <div class="hint">Applies to <strong id="filtered-feed-names"></strong> only. A paper is scored if its title or abstract contains one of these terms or a method from <strong>Transferable Methods</strong>. Filtering happens before any API call. <span id="filter-term-count"></span> <a href="#" id="load-terms-link">load suggested terms</a></div>
+            <div class="hint">Applies to <strong id="filtered-feed-names"></strong> only. A paper is scored if its title or abstract contains one of these terms or a method from <strong>Transferable methods</strong>. Filtering happens before any API call. <span id="filter-term-count"></span> <button type="button" class="link-btn" id="load-terms-link">load suggested terms</button></div>
           </div>
         </div>
       </div>
@@ -1358,7 +1517,7 @@
       <!-- LLM API key -->
       <div class="accordion">
         <button class="group-toggle collapsed" data-accordion="apikey-group">
-          <span class="group-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4"/><path d="M10.4 12.6 20 3"/><path d="m17 6 2.5 2.5"/><path d="m14.5 8.5 2 2"/></svg> LLM API Key</span>
+          <span class="group-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4"/><path d="M10.4 12.6 20 3"/><path d="m17 6 2.5 2.5"/><path d="m14.5 8.5 2 2"/></svg> LLM API key</span>
           <span class="toggle-icon"><svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
         </button>
         <div class="group-content collapsed" id="apikey-group">
@@ -1372,16 +1531,16 @@
         </div>
       </div>
 
-      <div class="sidebar-section sidebar-foot">
-        <div id="spend-row" data-tip="What the Anthropic API has actually been billed for, from the token counts it returns. The month resets on the first of the month; the shipped rates are $3/$15 per million tokens for Sonnet and $1/$5 for Haiku.">
-          <span class="spend-label">Spend</span><span id="spend-figures"></span>
-        </div>
-        <button class="btn btn-ghost btn-sm" id="clear-cache-btn" data-tip="Drop cached scores, seen ids and the dismissed list, so the next run re-scores everything. Starred papers are kept.">Clear cache</button>
-      </div>
-
     </div><!-- /.sidebar-body -->
+
+    <div class="sidebar-foot">
+      <div id="spend-row" data-tip="An estimate in one respect only: the token counts are measured — every Anthropic response reports what it used — but they are multiplied by the published list rates, $3/$15 per million tokens for Sonnet and $1/$5 for Haiku, which is not what your account pays if it has credits or discounts. The month resets on the first.">
+        <span class="spend-label">Cost estimate</span><span id="spend-figures"></span>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="clear-cache-btn" data-tip="Drop cached scores, seen ids and the dismissed list, so the next run re-scores everything. Starred papers are kept.">Clear cache</button>
+    </div>
   </aside>
-  <div id="sidebar-resizer"></div>
+  <div id="sidebar-resizer"><button id="sidebar-toggle-btn" aria-label="Hide the sidebar" aria-expanded="true" data-tip="Hide the sidebar"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 6 7 12 13 18"/><polyline points="18 6 12 12 18 18"/></svg></button></div>
 
   <!-- Research profile.
        It is long, it is set once and then left alone for months, and in the
@@ -1397,7 +1556,7 @@
     <div class="panel-body">
 
       <div class="sidebar-section">
-        <label>Research Context<span class="label-sub">who you are &middot; <span id="context-count">0</span>/160 chars</span></label>
+        <label>Research context<span class="label-sub">who you are &middot; <span id="context-count">0</span>/160 chars</span></label>
         <textarea id="context-input" maxlength="160" placeholder="e.g. I am a climate scientist focused on the intersection of ML and atmospheric science."></textarea>
       </div>
 
@@ -1407,7 +1566,7 @@
       </div>
 
       <div class="sidebar-section">
-        <label>Transferable Methods <span class="label-note">(score 8&ndash;10)</span><span class="label-sub">not yet in your field &middot; spatial/temporal methods</span></label>
+        <label>Transferable methods <span class="label-note">(score 8&ndash;10)</span><span class="label-sub">not yet in your field &middot; spatial/temporal methods</span></label>
         <textarea id="methods-input" placeholder="- uncertainty quantification&#10;- OOD detection&#10;- probabilistic forecasting"></textarea>
       </div>
 
@@ -1417,7 +1576,7 @@
       </div>
 
       <div class="sidebar-section">
-        <label>Priority Authors <span class="label-note">(score 8&ndash;10)</span></label>
+        <label>Priority authors <span class="label-note">(score 8&ndash;10)</span></label>
         <textarea id="authors-input" placeholder="One name per line. Papers by these authors always score 8-10."></textarea>
       </div>
 
@@ -1433,7 +1592,7 @@
             <span class="slider-badge" id="examples-sent-badge">20</span>
           </div>
           <input type="range" class="slider" id="examples-sent-range" min="0" max="30" step="1" value="20" aria-label="How many of the newest learned examples go into the scoring prompt">
-          <input type="number" id="examples-sent" class="slider-source" tabindex="-1" aria-hidden="true" min="0" max="30" step="1" value="20">
+          <input type="number" id="examples-sent" hidden min="0" max="30" step="1" value="20">
           <div class="hint">How many of the newest examples go into the scoring prompt. 0 sends none. <span id="examples-count"></span></div>
         </div>
         <div id="examples-list"></div>
@@ -1450,11 +1609,11 @@
       <div id="stats-bar" style="display:none">
         <div class="stat" data-tip="Papers this run pulled from the selected feeds and scored."><span class="stat-val" id="stat-total">0</span><span class="stat-label">Fetched</span></div>
         <div class="stat" data-tip="Papers passing the current filter, score floor and search — what is on screen now."><span class="stat-val" id="stat-shown">0</span><span class="stat-label">Shown</span></div>
-        <div class="stat" data-tip="Papers never seen in any previous run, counted at or above the current score floor. These carry a ring round the score badge."><span class="stat-val" id="stat-new">0</span><span class="stat-label">New</span></div>
-        <div class="stat" data-tip="Papers scored 8 or more, counted across the whole run rather than only what is shown."><span class="stat-val" id="stat-hi">0</span><span class="stat-label">Score≥8</span></div>
+        <div class="stat" data-tip="Papers never seen in any previous run, counted at or above the current score floor. These carry a ring around the score badge."><span class="stat-val" id="stat-new">0</span><span class="stat-label">New</span></div>
+        <div class="stat" data-tip="Papers scored 8 or more, counted across the whole run."><span class="stat-val" id="stat-hi">0</span><span class="stat-label">Score≥8</span></div>
       </div>
       <div id="filter-bar">
-        <div class="filter-title">Filter &amp; Sort</div>
+        <div class="filter-title">Filter &amp; sort</div>
         <div class="filter-controls">
           <button aria-pressed="true" class="filter-btn active" data-filter="all">All</button>
           <button aria-pressed="false" class="filter-btn" data-filter="new">New only</button>
@@ -1472,7 +1631,7 @@
             <option value="10">Score = 10</option>
           </select>
           </span>
-          <button aria-pressed="false" class="filter-btn" data-filter="starred" data-tip="Papers you saved. Shown whatever their score and whether or not the last run fetched them.">&#9733; Starred <span id="starred-count"></span></button>
+          <button aria-pressed="false" class="filter-btn" data-filter="starred" data-tip="Papers you saved.">&#9733; Starred <span id="starred-count"></span></button>
           <button class="btn btn-ghost btn-sm" id="clear-starred-btn" style="display:none" data-tip="Remove every starred paper. Cannot be undone.">Clear starred</button>
           <div class="search-wrap"><svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg><input type="text" id="search-box" placeholder="Search papers..." data-tip="Filters the shown papers by title and author. Applies in the starred view too."></div>
         </div>
@@ -1484,7 +1643,7 @@
       <div id="papers-container"></div>
       <div id="empty-state">
         <div class="big" id="empty-title">No papers yet</div>
-        <div id="empty-body"><ol><li>Paste an Anthropic API key into <strong>LLM API Key</strong> &mdash; get one at <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>.</li><li>Open <strong>Research profile</strong> from the person icon in the left rail and say what you work on.</li><li>Pick your sources under <strong>Select Journals</strong>.</li><li>Hit <strong>&#8595; Fetch &amp; Score</strong>. Expect about $0.10 per 100 papers, billed to your own key.</li></ol><p class="empty-foot">First time here? <button class="link-btn" id="empty-docs-btn">Read the documentation</button>.</p></div>
+        <div id="empty-body"><ol><li><button class="link-btn" data-open="apikey-group">Add your API key</button></li><li>Fill in your <button class="link-btn" data-open="profile">Research profile</button></li><li>Choose your <button class="link-btn" data-open="journals-group">journals</button></li><li>Hit <strong>Fetch &amp; Score</strong></li></ol><p class="empty-foot">About $0.10 per 100 papers. <button class="link-btn" id="empty-docs-btn">Read the documentation</button></p></div>
       </div>
     </section>
     <footer id="app-footer"></footer>
@@ -1495,7 +1654,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.0';
+const VERSION = 'v3.2';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -1671,20 +1830,24 @@ const JOURNALS = [
   }
 ];
 
-// ── CORS PROXIES (only used for arXiv RSS) ───────────────────────────────────
-// Ordered by observed reliability, not alphabetically. On 2026-08-23 allorigins
-// returned 502 and codetabs 503 while corsproxy.io served normally, so trying
-// allorigins first spent two dead attempts before reaching the working relay.
-// Note corsproxy.io rejects `Origin: null`, so this pool only works when the
-// page is served over http://localhost rather than opened as a file:// URL.
+// arXiv sends no access-control-allow-origin header, so its feeds have to come
+// through a relay. All of these are free third-party services outside our
+// control: on 2026-08-23 corsproxy.io started answering every keyless request
+// with 403 "Anonymous legacy proxy URLs are no longer supported", and it was
+// removed rather than left in the list, because a guaranteed failure at the
+// front of the pool costs a round trip on every arXiv fetch and buys nothing.
+// The order is deliberate — cors.lol answered correctly when the other two were
+// returning 522 — but any of them can be down on any given day, which is why
+// the arXiv fetch asks for an explicit date window (see fetchArxivApi): a relay
+// outage then delays papers rather than losing them.
 const CORS_PROXIES = [
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.cors.lol/?url=${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
 ];
 
-// A cold relay cache regularly takes longer than the old 12 s to answer, which
-// showed up as "All proxies failed" rather than as slowness.
+// A cold relay regularly takes longer than the old 12 s to answer, which showed
+// up as "All proxies failed" rather than as slowness.
 const PROXY_TIMEOUT_MS = 25000;
 
 // ── MODEL ─────────────────────────────────────────────────────────────────────
@@ -1692,7 +1855,10 @@ const PROXY_TIMEOUT_MS = 25000;
 // to keep costs predictable — newer models may be significantly more expensive.
 const MODEL              = 'claude-sonnet-4-5';
 const MODEL_HAIKU        = 'claude-haiku-4-5-20251001';
-// HAIKU_THRESHOLD is read dynamically from #haiku-threshold in settings
+// HAIKU_THRESHOLD is read dynamically from #haiku-threshold in settings; this
+// is only the fallback for an unreadable field, and it has to match the value
+// the markup ships or a fresh install and a broken field would disagree.
+const HAIKU_THRESHOLD_DEFAULT = 5;
 
 // ── API PRICING ───────────────────────────────────────────────────────────────
 // Dollars per million tokens, verified against platform.claude.com on the date
@@ -1828,7 +1994,7 @@ function loadState() {
     const authors = localStorage.getItem('litmonitor_authors');
     if (authors) document.getElementById('authors-input').value = authors;
     const days = localStorage.getItem('litmonitor_days');
-    applyStoredSelect('days-back', days);
+    applyStoredDays(days);
     // Profile always starts open each session — no persistence for collapsed state
     const score = localStorage.getItem('litmonitor_minscore');
     applyStoredSelect('min-score', score);
@@ -2146,7 +2312,7 @@ const DEFAULT_DOMAIN_TERMS = [
   'spatiotemporal', 'geospatial'
 ];
 
-// Method terms come from the Transferable Methods box, which is the profile
+// Method terms come from the Transferable methods box, which is the profile
 // section that deliberately describes work with no earth application yet. A
 // gate built on domain words alone would drop exactly those papers before they
 // were ever scored, contradicting the 8-10 rule the scoring prompt applies to
@@ -2437,13 +2603,15 @@ function costPerPaper(spend) {
 // the stored month total rather than from runUsage, so a fresh load shows the
 // figure before any fetch has happened; the run half is appended only once
 // something has been billed this session.
-function spendLine(spend, usage, verified) {
+// PRICE_VERIFIED is deliberately not shown: it is the date someone last checked
+// the published rates by hand, which nobody reading this line can act on,
+// verify or refresh. It stays in the source, where the person who can is.
+function spendLine(spend, usage) {
   const month = (spend && spend.cost) ? spend.cost : 0;
   const parts = [];
   if (usage && usage.calls) parts.push(`$${usage.cost.toFixed(3)} this run`);
   parts.push(`$${month.toFixed(2)} in ${MONTH_NAMES[new Date().getMonth()]}`);
   if (spend && spend.papers > 0) parts.push(`${spend.papers} papers scored`);
-  parts.push(`rates verified ${verified}`);
   return parts.join(' · ');
 }
 
@@ -2452,7 +2620,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July',
 
 function renderSpend() {
   const el = document.getElementById('spend-figures');
-  if (el) el.textContent = spendLine(loadSpend(), runUsage, PRICE_VERIFIED);
+  if (el) el.textContent = spendLine(loadSpend(), runUsage);
 }
 
 // ── STARRED PAPERS ────────────────────────────────────────────────────────────
@@ -2546,7 +2714,7 @@ function buildJournalList() {
     item.innerHTML = `
       <input type="checkbox" data-journal-id="${j.id}" checked>
       <span class="journal-name">${j.name}</span>
-      <span class="journal-source ${isDirect ? 'direct' : ''}" data-tip="${isDirect ? 'Fetched straight from the OpenAlex API.' : 'Fetched from an RSS feed through a CORS proxy, which can fail transiently.'}">${isDirect ? 'api' : 'rss'}</span>
+      <span class="journal-source" data-tip="${isDirect ? 'Fetched straight from the OpenAlex API.' : 'Fetched from the arXiv API through a relay. A relay can fail transiently; the days it misses are asked for again next fetch.'}">${isDirect ? 'api' : 'relay'}</span>
     `;
     const cb = item.querySelector('input');
     cb.addEventListener('change', () => {
@@ -2557,6 +2725,18 @@ function buildJournalList() {
     container.appendChild(item);
   });
   updateJournalCount();
+}
+
+// arXiv hands the same paper three different links depending on the path: the
+// query API says .../abs/2608.21108v1, the feed and rss2json say .../abs/2608.21108.
+// parseRSS uses the link as the paper's id, and the score cache, the seen set,
+// the dismissed set and every starred snapshot key on that id — so an unnormalised
+// id means re-scoring every arXiv paper at full price, marking it all new, and
+// losing every arXiv star the first time a run changes path. A v1→v2 revision
+// would mint a third id on top.
+function normalizeArxivLink(link) {
+  const m = (link || '').match(/^https?:\/\/arxiv\.org\/abs\/(.+?)(v\d+)?\/?$/i);
+  return m ? `https://arxiv.org/abs/${m[1]}` : link;
 }
 
 // ── FETCH VIA PROXY (arXiv only) ─────────────────────────────────────────────
@@ -2573,6 +2753,213 @@ async function fetchWithProxy(url) {
   throw new Error(`All proxies failed for ${url}`);
 }
 
+// ── LAST-RESORT RELAY: rss2json ──────────────────────────────────────────────
+// The three relays above hand back the feed unchanged. rss2json parses it for
+// us and answers in JSON, which makes it a different shape and a fourth
+// dependency — but on 2026-08-24, with corsproxy.io closed to keyless requests
+// and allorigins and codetabs both answering 5xx, it was the only service still
+// returning arXiv at all.
+//
+// Its free tier stops at ten items. That is fine for physics.ao-ph, which
+// announces a handful a day, and useless for cs.LG, which announced 195 the
+// morning this was written — so a full page is treated as *truncated* and
+// reported, rather than passed off as the day's papers. A truncated source
+// keeps the run from counting as clean, so the window is asked for again.
+const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
+const RSS2JSON_CAP = 10;
+
+// rss2json normally answers "YYYY-MM-DD HH:MM:SS" in UTC, but it passes some
+// feeds' RFC-822 dates straight through. Parsing only the first shape turned
+// every item into an Invalid Date, which failed the cutoff test and emptied the
+// result while still reporting a full page.
+function rss2jsonDate(raw) {
+  if (!raw) return new Date();
+  const iso = new Date(String(raw).replace(' ', 'T') + 'Z');
+  if (!isNaN(iso)) return iso;
+  const loose = new Date(raw);
+  return isNaN(loose) ? new Date() : loose;
+}
+
+async function fetchArxivViaJson(feedUrl, journalName, cutoff) {
+  const resp = await fetch(RSS2JSON + encodeURIComponent(feedUrl),
+                           { signal: AbortSignal.timeout(PROXY_TIMEOUT_MS) });
+  if (!resp.ok) throw new Error(`rss2json HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (data.status !== 'ok' || !Array.isArray(data.items)) {
+    throw new Error(`rss2json: ${data.status || 'no items'}`);
+  }
+  const papers = data.items.map(it => {
+    const link = normalizeArxivLink(it.link || it.guid || '');
+    return {
+      id: link,
+      title: (it.title || '').trim(),
+      authors: it.author || '',
+      // Raw, exactly as the parseRSS path stores it: the stored abstract is what
+      // goes into the scoring prompt, so cleaning it here would mean the same
+      // paper scored differently depending on which relay served it.
+      abstract: it.description || it.content || '',
+      link,
+      date: rss2jsonDate(it.pubDate),
+      journal: journalName,
+      preprint: true
+    };
+  }).filter(p => p.title && p.id && (!cutoff || p.date >= cutoff));
+  return { papers, items: data.items.length, truncated: data.items.length >= RSS2JSON_CAP };
+}
+
+// ── FETCH FROM ARXIV ─────────────────────────────────────────────────────────
+// The RSS feed carries one announcement cycle and nothing else, so a run that
+// fails — or simply does not happen for a few days — used to lose those papers
+// permanently: no setting could ask for them again. The query API does take a
+// date range, so the window the user asked for is what is requested, and a day
+// missed today is picked up by the next successful run.
+//
+// The feed stays as the fallback: it is one request, it needs no date
+// arithmetic, and when the API is unreachable it is better than nothing.
+const ARXIV_API = 'https://export.arxiv.org/api/query';
+const ARXIV_API_MAX = 200;     // entries per request; the API's own ceiling is higher
+const ARXIV_API_PAGES = 3;     // 600 per category is far above a normal window
+
+function arxivStamp(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}`;
+}
+
+function arxivApiUrl(cat, cutoff, now, start) {
+  const window = `submittedDate:[${arxivStamp(cutoff)}+TO+${arxivStamp(now)}]`;
+  return `${ARXIV_API}?search_query=cat:${encodeURIComponent(cat)}+AND+${window}`
+       + `&start=${start}&max_results=${ARXIV_API_MAX}`
+       + `&sortBy=submittedDate&sortOrder=descending`;
+}
+
+// arXiv asks for three seconds between requests. The pages of one category, and
+// the categories themselves, are fetched from the same worker pool, so a shared
+// gate is the only place that can honour it — and request bunching is exactly
+// what produced this release's OpenAlex 429s. Probing arXiv without it earned a
+// 429 and then a 503 within a few minutes.
+const ARXIV_MIN_GAP_MS = 3000;
+let arxivNextSlot = 0;
+
+async function arxivSlot() {
+  const now = Date.now();
+  const wait = Math.max(0, arxivNextSlot - now);
+  arxivNextSlot = Math.max(now, arxivNextSlot) + ARXIV_MIN_GAP_MS;
+  if (wait) await new Promise(r => setTimeout(r, wait));
+}
+
+// A relay that is down usually answers with its own HTML error page, which is
+// longer than fetchWithProxy's 100-character floor and parses as a feed with no
+// entries. Without this check that reads as "arXiv published nothing", which is
+// indistinguishable from the truth and silently marks the window as covered.
+function looksLikeArxivFeed(xml) {
+  return /<feed[\s>]/.test(xml) || /<entry[\s>]/.test(xml);
+}
+
+// Returns { papers, total, capped } for the window, or throws so the caller can
+// fall back. `total` is arXiv's own count for the window, which is how a run
+// knows it asked for more than ARXIV_API_PAGES could carry.
+async function fetchArxivApi(cat, journalName, cutoff, now) {
+  const out = [];
+  let total = null;
+  for (let page = 0; page < ARXIV_API_PAGES; page++) {
+    await arxivSlot();
+    const xml = await fetchWithProxy(arxivApiUrl(cat, cutoff, now, page * ARXIV_API_MAX));
+    if (!looksLikeArxivFeed(xml)) throw new Error('relay returned something that is not an arXiv feed');
+    if (total === null) {
+      const m = xml.match(/opensearch:totalResults[^>]*>(\d+)</);
+      total = m ? Number(m[1]) : null;
+    }
+    out.push(...parseRSS(xml, journalName, cutoff, true));
+    // A short page is the last page. Counting parsed papers rather than raw
+    // entries would stop early whenever the cutoff filtered some out, so the
+    // entry count is what decides.
+    if ((xml.match(/<entry[\s>]/g) || []).length < ARXIV_API_MAX) break;
+  }
+  // Descending by submission date, so what a cap discards is the OLDEST in the
+  // window — the backlog this whole path exists to collect.
+  return { papers: out, total, capped: total !== null && total > ARXIV_API_PAGES * ARXIV_API_MAX };
+}
+
+// The feed and the query cover DIFFERENT days, which is why the answer is both
+// of them rather than one with the other as a fallback:
+//
+//   • the feed carries the announcement made today, and nothing older;
+//   • the query carries the window by submission date — but arXiv's
+//     submittedDate index runs two to three days behind, so the newest days are
+//     simply absent from it. Measured 2026-08-24: cs.LG returned 0 for a 2-day
+//     window, 43 for 3 days, 148 for 4, while the feed served that morning's
+//     announcement in the same minute.
+//
+// Taking the query alone therefore returns nothing on the shipped 2-day default
+// and, because empty is not an error, marks the window covered — losing exactly
+// the papers this path was written to protect. Taking the feed alone loses every
+// day a run did not happen. The union of the two, de-duplicated on the
+// normalised arXiv id, is what covers both ends.
+async function fetchArxivBoth(j, cat, cutoff, fetchErrors, partialNotes) {
+  const byId = new Map();
+  const add = list => list.forEach(p => { if (!byId.has(p.id)) byId.set(p.id, p); });
+  const failures = [];
+
+  // Today's announcement, from whichever relay will serve it.
+  try {
+    const xml = await fetchWithProxy(j.rss);
+    add(parseRSS(xml, j.name, cutoff, j.preprint));
+  } catch(feedErr) {
+    try {
+      const json = await fetchArxivViaJson(j.rss, j.name, cutoff);
+      add(json.papers);
+      if (json.truncated) {
+        partialNotes.push(`${j.name}: the usual relays are down and the fallback returns only `
+          + `${json.items} items per feed — the rest are requested again next run`);
+      }
+    } catch(jsonErr) {
+      failures.push(`today's announcement (${feedErr.message})`);
+    }
+  }
+
+  // The window by submission date, which is where a missed day comes back from.
+  if (cat) {
+    try {
+      const api = await fetchArxivApi(cat, j.name, cutoff, new Date());
+      add(api.papers);
+      if (api.capped) {
+        partialNotes.push(`${j.name}: ${api.total} papers in that window, more than the `
+          + `${ARXIV_API_PAGES * ARXIV_API_MAX} a run fetches — the oldest are requested again next run`);
+      }
+    } catch(apiErr) {
+      failures.push(`the ${cat} window (${apiErr.message})`);
+    }
+  }
+
+  // Only a source that produced nothing at all is a failure; one half answering
+  // is a partial, because the other half's days are still missing.
+  if (!byId.size) throw new Error(failures.join('; ') || 'nothing returned');
+  if (failures.length) partialNotes.push(`${j.name}: ${failures.join('; ')} — requested again next run`);
+  return [...byId.values()];
+}
+
+// OpenAlex answers 429 when a burst runs over its rate limit, and a whole
+// journal used to be dropped from the run for it. The limit is per second, not
+// per run, so waiting and asking again is the correct response; Retry-After is
+// honoured when it is sent, with a floor of two seconds.
+//
+// This started biting on 2026-08-23 for a reason worth recording: the arXiv
+// relays began failing instantly rather than timing out, which freed the fetch
+// pool's slots immediately and let the OpenAlex calls bunch far tighter than
+// they ever had while the proxies were merely slow.
+const OPENALEX_RETRIES = 2;
+const OPENALEX_RETRY_FLOOR_MS = 2000;
+
+async function openAlexFetch(url) {
+  for (let attempt = 0; ; attempt++) {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (resp.status !== 429 || attempt >= OPENALEX_RETRIES) return resp;
+    const ra = parseFloat(resp.headers.get('retry-after'));
+    const waitMs = Math.max(isFinite(ra) ? ra * 1000 : 0, OPENALEX_RETRY_FLOOR_MS * (attempt + 1));
+    await new Promise(r => setTimeout(r, waitMs));
+  }
+}
+
 // ── FETCH FROM OPENALEX (no proxy needed, fully open API) ────────────────────
 // identifier: ISSN string (e.g. "1748-9326") OR OpenAlex source ID (e.g. "S4306401273")
 // To find a source ID: https://api.openalex.org/sources?filter=display_name.search:JOURNAL+NAME
@@ -2583,7 +2970,7 @@ async function fetchOpenAlex(identifier, journalName, cutoff, isPreprint) {
     ? `primary_location.source.id:https://openalex.org/${identifier}`
     : `primary_location.source.issn:${identifier}`;
   const url = `https://api.openalex.org/works?filter=${filterKey},from_publication_date:${fromDate}&per-page=50&sort=publication_date:desc&select=id,title,authorships,abstract_inverted_index,primary_location,publication_date,doi&mailto=litmonitor@user`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const resp = await openAlexFetch(url);
   if (!resp.ok) throw new Error(`OpenAlex API error ${resp.status}`);
   const data = await resp.json();
   const results = [];
@@ -2632,7 +3019,14 @@ function parseRSS(xml, journalName, cutoff, isPreprint) {
 
     // Date
     let dateStr = '';
-    const dateEl = item.querySelector('pubDate, published, updated, dc\\:date, date');
+    // Explicit precedence rather than one selector list: a selector list returns
+    // whichever element comes first in the document, and an arXiv API entry puts
+    // <updated> before <published>. On a revised paper those differ, and it is
+    // the submission that belongs on the card.
+    const dateEl = item.querySelector('pubDate')
+                || item.querySelector('published')
+                || item.querySelector('dc\\:date, date')
+                || item.querySelector('updated');
     if (dateEl) dateStr = dateEl.textContent.trim();
     const date = dateStr ? new Date(dateStr) : new Date();
     if (cutoff && date < cutoff) return;
@@ -2665,7 +3059,10 @@ function parseRSS(xml, journalName, cutoff, isPreprint) {
       }).join(', ');
     }
 
-    // Unique id
+    // Unique id. arXiv links are normalised first, because the query API and the
+    // feed spell the same paper differently and every persisted store keys on
+    // this value.
+    link = normalizeArxivLink(link);
     const id = link || `${title}-${date.toISOString()}`;
 
     results.push({ id, title, authors, abstract, link, date, journal: journalName, preprint: !!isPreprint });
@@ -2821,7 +3218,7 @@ Use the researcher's profile sections to determine scores. The profile may conta
 
 - 8-10: Directly on-topic. Two pathways to this score:
   (a) PRIORITIZE match: the paper's topic, application area, or contribution directly matches something in the researcher's PRIORITIZE list. Use semantic judgment — exact keyword overlap is not required.
-  (b) TRANSFERABLE METHODS match: the paper advances or applies a technique listed in the researcher's METHODS section, AND the method operates on spatial, temporal, or spatiotemporal data in a way that would transfer naturally to the researcher's domain as described in their Research Context — even if it has not yet been applied there.${priorityAuthors ? `\n  (c) Priority authors: if ANY author or co-author matches a name in the priority list below, score 8-10 regardless of topic. Use fuzzy matching on last name + first initial if full names differ slightly.\n  PRIORITY AUTHORS:\n${priorityAuthors.split('\n').filter(a => a.trim()).map(a => `  - ${a.trim()}`).join('\n')}` : ''}
+  (b) TRANSFERABLE METHODS match: the paper advances or applies a technique listed in the researcher's METHODS section, AND the method operates on spatial, temporal, or spatiotemporal data in a way that would transfer naturally to the researcher's domain as described in their Research context — even if it has not yet been applied there.${priorityAuthors ? `\n  (c) Priority authors: if ANY author or co-author matches a name in the priority list below, score 8-10 regardless of topic. Use fuzzy matching on last name + first initial if full names differ slightly.\n  PRIORITY AUTHORS:\n${priorityAuthors.split('\n').filter(a => a.trim()).map(a => `  - ${a.trim()}`).join('\n')}` : ''}
 - 5-7: Peripherally relevant — related to the PRIORITIZE or TRANSFERABLE METHODS topics but not a strong match; might inform the researcher's work without being directly on-topic.
 - 1-4: Not relevant — matches topics in the DOWNGRADE list, or has no meaningful connection to any section of the researcher's profile.
 - 3-5: Default for papers that don't clearly fit any profile section — score conservatively unless you can identify a genuine connection.
@@ -3144,6 +3541,10 @@ window.addEventListener('resize', growAllTextareas);
 // Focus shows it as well as hover, so the keyboard reaches the same
 // explanations, and aria-describedby points the screen reader at it — which is
 // also why the tooltip is never the only place a control's name appears.
+// Kept beside the padding in the stylesheet: the measured line width is the
+// content box, and box-sizing is border-box here.
+const TIP_PAD_X = 11;
+
 (function() {
   const tip = document.createElement('div');
   tip.id = 'tip';
@@ -3153,6 +3554,7 @@ window.addEventListener('resize', growAllTextareas);
   let target = null;
 
   const hide = () => {
+    clearTimeout(openTimer);
     if (target) target.removeAttribute('aria-describedby');
     target = null;
     tip.classList.remove('open');
@@ -3168,7 +3570,12 @@ window.addEventListener('resize', growAllTextareas);
     // drawn in the wrong place.
     tip.style.left = '0px';
     tip.style.top  = '0px';
+    tip.style.width = 'auto';
     tip.classList.add('open');
+    const range = document.createRange();
+    range.selectNodeContents(tip);
+    const lineWidth = range.getBoundingClientRect().width;
+    if (lineWidth > 0) tip.style.width = `${Math.ceil(lineWidth) + TIP_PAD_X * 2}px`;
     const r = el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();
     const pad = 8;
@@ -3182,14 +3589,28 @@ window.addEventListener('resize', growAllTextareas);
     tip.style.top  = `${Math.round(top)}px`;
   };
 
-  const enter = e => {
+  const OPEN_DELAY = 500;
+  let openTimer = null;
+
+  const cancelOpen = () => { clearTimeout(openTimer); openTimer = null; };
+
+  const enter = (e, immediate) => {
     const el = e.target.closest && e.target.closest('[data-tip]');
     if (el === target) return;
-    if (el) show(el); else hide();
+    cancelOpen();
+    if (!el) return hide();
+    if (immediate || tip.classList.contains('open')) show(el);
+    else openTimer = setTimeout(() => show(el), OPEN_DELAY);
   };
 
-  document.addEventListener('mouseover', enter);
-  document.addEventListener('focusin', enter);
+  // The status line rewrites its own tip as a run progresses. Re-entering it is
+  // a no-op while the pointer has not moved, so the open tooltip would go on
+  // showing the previous message; this lets a writer refresh it in place.
+  window.refreshTip = el => { if (target && target === el) show(el); };
+
+  document.addEventListener('mousedown', hide, true);
+  document.addEventListener('mouseover', e => enter(e, false));
+  document.addEventListener('focusin', e => enter(e, true));
   // Not a capturing mouseleave: that fires for every element left anywhere in
   // the tree, so moving from .stat-val to .stat-label inside one tipped .stat
   // hid and re-showed the tip through the transition. mouseover already hides
@@ -3252,20 +3673,44 @@ const PAGE_TOKENS = [
   '--text', '--text2', '--text3',
   '--accent', '--accent2', '--on-accent',
   '--radius', '--radius-sm',
-  '--amber', '--red',
+  '--amber', '--red', '--amber-text', '--red-text',
   '--score-hi', '--score-mid', '--score-lo',
 ];
 
 function pageThemeVars() {
   const cs = getComputedStyle(document.documentElement);
-  return PAGE_TOKENS.map(t => `${t}:${cs.getPropertyValue(t).trim()};`).join('');
+  const vars = PAGE_TOKENS.map(t => `${t}:${cs.getPropertyValue(t).trim()};`).join('');
+  // color-scheme is not a custom property, so it does not travel with the
+  // tokens. Without it a dark generated page keeps a light scrollbar and light
+  // native controls — the one part of the page the palette cannot reach.
+  return vars + `color-scheme:${cs.getPropertyValue('color-scheme').trim() || 'light'};`;
 }
 
-// The three bands as CSS values, so a generated page names a token rather than
-// repeating a hex the way it used to.
-function pageScoreColour(score) {
-  return score >= 8 ? 'var(--score-hi)' : score >= 6 ? 'var(--score-mid)' : 'var(--score-lo)';
+// The rail's own SVG for one of its buttons, so the docs shows the mark the
+// user clicks rather than a stand-in glyph. Read off the live document for the
+// same reason the palette is: one definition, and no way for the two to drift.
+function railIcon(id) {
+  const svg = document.querySelector(`#${id} svg`);
+  return svg ? svg.outerHTML : '';
 }
+
+// The app's own favicon, read off the live document rather than copied, so the
+// data URI keeps one home and a brief or an export tab is recognisable beside
+// the app's.
+function pageIcon() {
+  const l = document.querySelector('link[rel="icon"]');
+  return l ? l.outerHTML : '';
+}
+
+// The three bands exactly as the feed paints them — a filled badge for 8-10, a
+// tint for 5-7, grey for the rest — for a generated page that cannot reach the
+// app's stylesheet. Class names and thresholds are the feed's own (scoreClass),
+// so the two cannot drift apart.
+const PAGE_SCORE_CSS = `
+  .score-badge{flex-shrink:0;font-weight:700;font-size:0.8rem;border:1.5px solid;border-radius:var(--radius-sm);padding:1px 6px;line-height:1.6;margin-top:1px}
+  .score-hi{color:var(--on-accent);background:var(--score-hi);border-color:var(--score-hi)}
+  .score-mid{color:var(--score-mid);background:color-mix(in srgb, var(--score-mid) 12%, transparent);border-color:color-mix(in srgb, var(--score-mid) 35%, transparent)}
+  .score-lo{color:var(--text3);background:color-mix(in srgb, var(--score-lo) 10%, transparent);border-color:var(--border2)}`;
 
 // ── EXPORT ────────────────────────────────────────────────────────────────────
 function exportVisible() {
@@ -3285,14 +3730,13 @@ function exportVisible() {
     const auth = p.authors
       ? p.authors.split(',').slice(0, 3).join(', ') + (p.authors.split(',').length > 3 ? ' et al.' : '')
       : '';
-    const scoreCol  = pageScoreColour(p.score);
     const titleHtml = p.link
       ? `<a href="${p.link}" target="_blank" rel="noopener">${escHtml(p.title)}</a>`
       : escHtml(p.title);
     const citation = escHtml(buildCitation(p));
     return `<div class="card">
   <div class="card-header">
-    <span class="score-badge" style="color:${scoreCol};border-color:${scoreCol}">${p.score}</span>
+    <span class="score-badge ${scoreClass(p.score)}">${p.score}</span>
     <div class="card-title">${titleHtml}</div>
   </div>
   <div class="card-meta">${escHtml(p.journal)}${mo ? ' &middot; ' + escHtml(mo) : ''}${auth ? ' &middot; ' + escHtml(auth) : ''}</div>
@@ -3307,6 +3751,7 @@ function exportVisible() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+${pageIcon()}
 <title>LitMonitor Earth — ${dateStr}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap" rel="stylesheet">
@@ -3323,7 +3768,7 @@ function exportVisible() {
   .dateline{font-size:0.78rem;color:var(--text2)}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.3rem;margin-bottom:1rem}
   .card-header{display:flex;gap:0.75rem;align-items:flex-start;margin-bottom:0.3rem}
-  .score-badge{flex-shrink:0;font-weight:700;font-size:0.8rem;border:1.5px solid;border-radius:var(--radius-sm);padding:1px 6px;line-height:1.6;margin-top:1px}
+${PAGE_SCORE_CSS}
   .card-title{font-size:0.95rem;font-weight:600;line-height:1.4;color:var(--text)}
   .card-title a{color:var(--accent);text-decoration:none}
   .card-title a:hover{text-decoration:underline}
@@ -3331,7 +3776,7 @@ function exportVisible() {
   .card-reason{font-size:0.85rem;color:var(--text);font-style:italic;padding-left:2.2rem;margin-bottom:0.4rem}
   details{padding-left:2.2rem;margin-top:0.3rem}
   summary{cursor:pointer;font-size:0.78rem;color:var(--text2)}
-  .abstract{font-size:0.83rem;line-height:1.6;color:var(--text2);margin:0.4rem 0 0}
+  .abstract{font-size:0.83rem;line-height:1.6;color:var(--text);margin:0.4rem 0 0}
   .dl-btn{position:fixed;top:1rem;right:1rem;background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--radius-sm);padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.25)}
   .card-actions{padding-left:2.2rem;margin-top:0.5rem}
   .copy-cite-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 10px;font-size:0.75rem;color:var(--text2);cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s}
@@ -3348,7 +3793,7 @@ function exportVisible() {
     <div class="dateline">${timestamp} &middot; ${visible.length} papers &middot; min score ${document.getElementById('min-score').value}${currentFilter !== 'all' ? ' &middot; filter: ' + currentFilter : ''}${searchQuery ? ' &middot; search: &ldquo;' + escHtml(searchQuery) + '&rdquo;' : ''}</div>
   </div>
   ${cards}
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
@@ -3464,7 +3909,12 @@ function renderExamples() {
 // sample are shown; otherwise the PI cannot tell what the gate is testing.
 function updateFilterTermCount() {
   const names = document.getElementById('filtered-feed-names');
-  if (names) names.textContent = filteredFeedNames().join(', ');
+  // It is always the three high-volume arXiv feeds today, but an empty list
+  // would leave the sentence reading "Applies to  only."
+  if (names) {
+    const feeds = filteredFeedNames();
+    names.textContent = feeds.length ? feeds.join(', ') : 'no feeds — none are marked high-volume';
+  }
   const el = document.getElementById('filter-term-count');
   if (!el) return;
   const domain  = parseDomainTerms(document.getElementById('domain-terms-input').value);
@@ -3493,7 +3943,7 @@ function updateStarredCount() {
     minScore.disabled = off;
     const host = document.getElementById('min-score-tip');
     if (host) host.dataset.tip = off
-      ? 'Not applied to starred papers — a star outranks the score floor.'
+      ? 'Not applied to starred papers.'
       : 'Hide papers scoring below this. Not applied in the Starred view.';
   }
 }
@@ -3528,9 +3978,7 @@ function renderPapers() {
     const body  = document.getElementById('empty-body');
     if (papers.length === 0) {
       title.textContent = 'Nothing fetched yet';
-      body.innerHTML = `<ol><li>Paste an Anthropic API key into <strong>LLM API Key</strong> &mdash; get one at <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>.</li><li>Open <strong>Research profile</strong> from the person icon in the left rail and say what you work on.</li><li>Pick your sources under <strong>Select Journals</strong>.</li><li>Hit <strong>&#8595; Fetch &amp; Score</strong>. Expect about $0.10 per 100 papers, billed to your own key.</li></ol><p class="empty-foot">First time here? <button class="link-btn" id="empty-docs-btn">Read the documentation</button>.</p>`;
-      // The button is rewritten with the block, so its handler goes on with it.
-      document.getElementById('empty-docs-btn').addEventListener('click', openDocs);
+      body.innerHTML = `<ol><li><button class="link-btn" data-open="apikey-group">Add your API key</button></li><li>Fill in your <button class="link-btn" data-open="profile">Research profile</button></li><li>Choose your <button class="link-btn" data-open="journals-group">journals</button></li><li>Hit <strong>Fetch &amp; Score</strong></li></ol><p class="empty-foot">About $0.10 per 100 papers. <button class="link-btn" id="empty-docs-btn">Read the documentation</button></p>`;
     } else if (currentFilter === 'starred') {
       title.textContent = 'Nothing starred';
       body.textContent = 'Use \u2606 Star on a paper to keep it here across runs.';
@@ -3565,7 +4013,7 @@ function renderPapers() {
     const href = safeUrl(p.link);
     const title = escHtml(p.title);
     const linkHtml = href
-      ? `<a href="${escHtml(href)}" target="_blank" rel="noopener">${title}<span class="ext">&#8599;</span></a>`
+      ? `<a href="${escHtml(href)}" target="_blank" rel="noopener">${title}</a>`
       : title;
 
     const cardCitation = escHtml(buildCitation(p));
@@ -3587,11 +4035,11 @@ function renderPapers() {
         <div class="paper-title">${linkHtml}</div>
         <div class="paper-authors" data-tip="${escHtml(p.authors || 'Authors not available')}">${escHtml(p.authors || 'Authors not available')}</div>
         ${hasAbstract
-          ? `<div class="card-abstract ${bandClass(p.score)}"><div class="abstract-lede">${escHtml(abstractPreview(abstractText))}</div><div class="abstract-rest">${escHtml(abstractText)}</div><button class="abstract-btn" aria-expanded="false" data-tip="Expand the full abstract, including anything the preview skipped.">Show more</button></div>`
+          ? `<div class="card-abstract ${bandClass(p.score)}"><div class="abstract-lede">${escHtml(abstractPreview(abstractText))}</div><div class="abstract-rest">${escHtml(abstractText)}</div><button class="abstract-btn" aria-expanded="false" data-tip="Expand the full abstract.">Show more</button></div>`
           : '<div class="card-abstract no-abstract open">No abstract available.</div>'}
         ${p.reason ? `<div class="card-reason"><span class="reason-label">Score reasoning</span>${escHtml(p.reason)}</div>` : ''}
         <div class="card-actions">
-          <button class="btn btn-ghost copy-cite-btn" data-citation="${cardCitation}" data-tip="Copy a formatted citation. A preprint is labelled as one and always carries its URL.">Copy citation</button>
+          <button class="btn btn-ghost copy-cite-btn" data-citation="${cardCitation}" data-tip="Copy a formatted citation.">Copy citation</button>
           <button class="btn btn-ghost star-btn" data-id="${escHtml(p.id)}" data-tip="Keep this paper in the Starred view across runs, whatever its score. Survives Clear cache.">${starred[p.id] ? '&#9733; Starred' : '&#9734; Star'}</button>
           <button class="btn btn-ghost example-btn" data-id="${escHtml(p.id)}" data-tip="Record this paper as a learned example, so future runs score papers like it higher. Invalidates the score cache.">${examples.some(e => e.id === p.id) ? '&#10003; Learned' : '&#43; More like this'}</button>
           <button class="btn btn-ghost dismiss-btn" data-id="${escHtml(p.id)}" data-tip="Hide this paper and keep it out of future runs. Clear cache brings it back.">Dismiss</button>
@@ -3722,10 +4170,23 @@ function clearProgress() {
 // survive. clearErrors() at the top of each run empties the area.
 // The status line is truncated with an ellipsis, so the full text is mirrored
 // into the title attribute where it stays readable.
+// "8/23/2026 4:37:21 PM" is nineteen characters of a line that has to fit in a
+// 300px column, and the seconds were never worth one of them.
+function shortWhen(d) {
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const today = new Date();
+  const sameDay = d.getFullYear() === today.getFullYear()
+    && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+  return sameDay ? time : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
+}
+
 function setStatus(text) {
   const el = document.getElementById('status-line');
   el.textContent = text;
-  el.title = text;
+  // The clamp can hide the tail, so the whole line stays reachable on hover —
+  // through the same mechanism as everything else, not a title attribute.
+  el.dataset.tip = text;
+  if (window.refreshTip) window.refreshTip(el);
 }
 
 function showError(msg) {
@@ -3800,8 +4261,8 @@ async function runFetchAndScore() {
   const exampleLines = examplesForPrompt(examples);
   const fp = profileFingerprint(profile, priorityAuthors, exampleLines);
 
-  if (!apiKey) { showError('Enter your Anthropic API key under LLM API Key in the sidebar.'); return; }
-  if (!profile) { showError('Fill in at least Prioritize or Transferable Methods in the Research profile panel — the person icon in the left rail.'); return; }
+  if (!apiKey) { showError('Enter your Anthropic API key under LLM API key in the sidebar.'); return; }
+  if (!profile) { showError('Fill in at least Prioritize or Transferable methods in the Research profile panel — the person icon in the left rail.'); return; }
 
   const selectedJournals = JOURNALS.filter(j => {
     const cb = document.querySelector(`[data-journal-id="${j.id}"]`);
@@ -3831,13 +4292,22 @@ async function runFetchAndScore() {
   // Step 1: Fetch all journals
   let allPapers = [];
   let fetchErrors = [];
+  // A source that answered, but not completely — a relay cap, or a window wider
+  // than the API will page through. Kept apart from fetchErrors because it is
+  // not a failed source: it must not be subtracted from the "fetched from N
+  // journals" count, but it must still stop the run counting as clean, so the
+  // window is asked for again next time.
+  let partialNotes = [];
 
   // Sources were fetched strictly one after another: 26 of them, each up to 15 s
   // on OpenAlex or 3 x 25 s if every arXiv proxy has to be tried, so a degraded
   // run spent minutes here before a single token was spent. Six at a time is
   // well inside OpenAlex's published limits when a mailto is supplied, and it
   // leaves the three scoring workers waiting far less.
-  const FETCH_CONCURRENCY = 6;
+  // Six was chosen when every arXiv source held a slot for up to 25 s. With the
+  // relays failing fast, six slots meant six OpenAlex requests in flight
+  // continuously, which is what produced the 429s.
+  const FETCH_CONCURRENCY = 4;
   const results = new Array(selectedJournals.length).fill(null);
   let nextJournal = 0, fetched = 0;
 
@@ -3848,8 +4318,10 @@ async function runFetchAndScore() {
       if (j.type === 'openalex') {
         parsed = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, cutoff, j.preprint);
       } else {
-        const xml = await fetchWithProxy(j.rss);
-        parsed = parseRSS(xml, j.name, cutoff, j.preprint);
+        // The category is read off the feed URL rather than duplicated in
+        // JOURNALS, so the two can never disagree.
+        const cat = (j.rss.match(/\/rss\/(.+)$/) || [])[1];
+        parsed = await fetchArxivBoth(j, cat, cutoff, fetchErrors, partialNotes);
       }
       // The filter is applied per source, so each paper has to remember which
       // kind of feed it came from.
@@ -3881,8 +4353,18 @@ async function runFetchAndScore() {
 
   showProgress(selectedJournals.length, selectedJournals.length, `Fetched ${allPapers.length} papers from ${selectedJournals.length - fetchErrors.length} journals`);
 
+  // A failed or partial source does not advance litmonitor_last_fetch (see
+  // below), and the arXiv fetch asks for an explicit window, so the days it
+  // covers are re-requested by the next successful run. Saying so is the
+  // difference between a warning and an alarm.
   if (fetchErrors.length) {
-    showError(`Some feeds failed: ${fetchErrors.join(' | ')}. Papers from other journals will still be scored.`);
+    showError(`Some feeds failed: ${fetchErrors.join(' | ')}. Papers from the other sources are still scored, and because the failed window is not marked as covered, the next successful run asks for those days again.`);
+  }
+  // A partial is not a failure: the source answered, but not for the whole
+  // window, so it is reported separately and never subtracted from the count of
+  // sources that worked.
+  if (partialNotes.length) {
+    showNotice(`Fetched, but not in full: ${partialNotes.join(' | ')}.`);
   }
 
   if (allPapers.length === 0) {
@@ -4002,7 +4484,7 @@ async function runFetchAndScore() {
 
   if (uncachedPapers.length > 0) {
     if (haikusPrefilter) {
-      const haikuThreshold = parseInt(document.getElementById('haiku-threshold').value) || 3;
+      const haikuThreshold = parseInt(document.getElementById('haiku-threshold').value) || HAIKU_THRESHOLD_DEFAULT;
 
       // Papers Haiku has already judged under this profile need no second call.
       // The cached Haiku score is compared against the current threshold rather
@@ -4107,7 +4589,7 @@ async function runFetchAndScore() {
   // Only a clean run advances the clock. An aborted run, or one where a feed
   // failed, has not actually covered its window, and under "Auto" the next run
   // would otherwise start after the papers it never fetched.
-  const cleanRun = !abortRequested && !fetchErrors.length;
+  const cleanRun = !abortRequested && !fetchErrors.length && !partialNotes.length;
   if (cleanRun) {
     lsSet('litmonitor_last_fetch', now.toISOString());
     lsSet('litmonitor_last_count', scored.length);
@@ -4126,13 +4608,15 @@ async function runFetchAndScore() {
   // Papers are attributed here; the tokens themselves were folded in per call.
   // Only papers actually sent are attributed; an aborted run used to claim the
   // whole uncached set, which then deflated the measured dollars per paper.
-  const spend = addSpend({ papers: newScored.length }, now);
-  const costNote = runUsage.calls
-    ? ` · $${runUsage.cost.toFixed(3)} this run${runUsage.unpriced ? ' (+ unpriced model)' : ''} · $${spend.cost.toFixed(2)} this month`
-    : '';
-  const runDateTime = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+  addSpend({ papers: newScored.length }, now);
+  renderSpend();
+  // No money in this line. Every figure lives in the Spend row in the sidebar
+  // footer, which states the run, the month, the papers and the rate date in
+  // one place; repeating any of it here is what "the pricing is repeated" was.
+  const costNote = runUsage.unpriced ? ' · includes an unpriced model' : '';
+  const runDateTime = shortWhen(now);
   setStatus(haikusPrefilter && uncachedPapers.length > 0
-    ? `last run: ${runDateTime} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku ⚡${cacheNote}${gateNote}${dismissedNote}${dupeNote}${failedNote}${stoppedNote}${costNote}${storageNote}`
+    ? `last run: ${runDateTime} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku${cacheNote}${gateNote}${dismissedNote}${dupeNote}${failedNote}${stoppedNote}${costNote}${storageNote}`
     : `last run: ${runDateTime} · ${scored.length} papers scored${cacheNote}${gateNote}${dismissedNote}${dupeNote}${failedNote}${stoppedNote}${costNote}${storageNote}`);
 
   renderPapers();
@@ -4177,7 +4661,12 @@ function bindSlider(rangeId, targetId, badgeId) {
 
   const fromTarget = () => {
     range.value = isSelect ? String(target.selectedIndex) : target.value;
-    badge.textContent = isSelect ? target.options[target.selectedIndex].textContent : target.value;
+    const shown = isSelect ? target.options[target.selectedIndex].textContent : target.value;
+    badge.textContent = shown;
+    // The badge and the announcement have to say the same thing. Without this a
+    // screen reader reads the raw slider position, which for an option-indexed
+    // slider is a number that means nothing — "0" for Auto, "5" for unlimited.
+    range.setAttribute('aria-valuetext', shown === '\u221e' ? 'unlimited' : shown);
   };
 
   range.addEventListener('input', () => {
@@ -4194,15 +4683,126 @@ function bindSlider(rangeId, targetId, badgeId) {
   return fromTarget;
 }
 
+// ── FETCH DAYS BACK ──────────────────────────────────────────────────────────
+// Three controls over one hidden value: a slider for the range anyone actually
+// uses, a box for the number they want when 30 is not it, and Auto. The stored
+// value keeps the shape every other reader already expects — the word "auto",
+// or a number of days as a string — so nothing downstream changed.
+//
+// The slider saturates rather than clamping: typing 60 leaves the slider at its
+// 30 mark and the box saying 60, because dragging the box's value back to 30
+// would silently discard what was typed.
+const DAYS_BACK_MAX = 99;
+const DAYS_SLIDER_MAX = 30;
+
+// One place for the bounds, so the typed box, the stored value and the restorer
+// cannot disagree about what a legal window is.
+function clampDays(n) {
+  return Math.min(Math.max(n, 1), DAYS_BACK_MAX);
+}
+
+function daysBackFromControls() {
+  const raw = (document.getElementById('days-back-num').value || '').trim();
+  // A text field will hold anything at all, so the digits are what counts:
+  // "1 4" and "14d" both mean fourteen days.
+  const typed = raw.replace(/[^0-9]/g, '');
+  // The word is accepted as well as the number, because the box shows the word.
+  if (/^a/i.test(raw) && !typed) return 'auto';
+  const n = parseInt(typed);
+  if (!isFinite(n)) return String(DAYS_BACK_FALLBACK);
+  if (n === 0) return 'auto';       // the slider's floor, typed
+  return String(clampDays(n));
+}
+
+// Writes the hidden source from the controls, then paints the controls from it,
+// so the two views and the value can never drift apart.
+function paintDaysBack() {
+  const src   = document.getElementById('days-back');
+  const num   = document.getElementById('days-back-num');
+  const range = document.getElementById('days-back-range');
+  if (!src || !num || !range) return;
+
+  const value = daysBackFromControls();
+  src.value = value;
+  const isAuto = value === 'auto';
+  // Nothing is disabled: Auto is a value of the same control now, not a mode
+  // that switches two others off.
+  num.value  = isAuto ? 'Auto' : value;
+  range.value = isAuto ? '0' : String(Math.min(Number(value), DAYS_SLIDER_MAX));
+  range.setAttribute('aria-valuetext', isAuto ? 'automatic' : `${value} days`);
+}
+
+// Restores a stored value. Anything unparseable falls back rather than leaving
+// the field empty, and an out-of-range number is clamped instead of discarded —
+// the old select silently turned a value it did not offer into the empty string.
+function applyStoredDays(stored) {
+  const num = document.getElementById('days-back-num');
+  if (!num) return;
+  if (stored === 'auto') { num.value = 'Auto'; paintDaysBack(); return; }
+  const n = parseInt(stored);
+  num.value = String(isFinite(n) ? clampDays(n) : DAYS_BACK_FALLBACK);
+  paintDaysBack();
+}
+
+function bindDaysBack() {
+  const num   = document.getElementById('days-back-num');
+  const range = document.getElementById('days-back-range');
+  const commit = () => {
+    paintDaysBack();
+    document.getElementById('days-back').dispatchEvent(new Event('change'));
+  };
+  range.addEventListener('input', () => {
+    num.value = range.value === '0' ? 'Auto' : range.value;
+    commit();
+  });
+  // 'input' would fight the typist: clearing the box to retype 14 momentarily
+  // reads as empty and would snap to the fallback under the cursor.
+  num.addEventListener('change', commit);
+  paintDaysBack();
+}
+
 const syncSliders = (() => {
   const syncs = [
-    bindSlider('days-back-range',       'days-back',       'days-back-badge'),
     bindSlider('haiku-threshold-range', 'haiku-threshold', 'haiku-threshold-badge'),
-    bindSlider('abstract-chars-range',  'abstract-chars',  'abstract-chars-badge'),
     bindSlider('examples-sent-range',   'examples-sent',   'examples-sent-badge'),
   ];
+  // Fetch days back has three controls over one source rather than a slider over
+  // one, so it carries its own painter; it still has to be resynced with the
+  // rest after loadState writes the stored values.
+  bindDaysBack();
+  syncs.push(paintDaysBack);
   return () => syncs.forEach(f => f());
 })();
+
+// The API key section is collapsed once a key exists, which is right — it holds
+// a secret and is set once — but it also meant the one fact worth knowing about
+// it was only visible with it open.
+// The first-run steps name places — the API key section, the profile, the
+// journal list. Naming one and leaving the reader to go and find it is a step
+// the app can take for them.
+//
+// One delegated listener on the container rather than one per button, because
+// this block exists twice: once in the markup, for a browser that has never
+// fetched anything, and once as a string renderPapers writes when a run comes
+// back empty. Binding the buttons themselves meant whichever copy was not
+// current had no handlers — on a genuine first load renderPapers is never
+// called at all, so "Read the documentation" did nothing.
+function bindEmptyStateSteps() {
+  const body = document.getElementById('empty-body');
+  if (!body) return;
+  body.addEventListener('click', e => {
+    const btn = e.target.closest && e.target.closest('.link-btn');
+    if (!btn || !body.contains(btn)) return;
+    if (btn.id === 'empty-docs-btn') { openDocs(); return; }
+    const target = btn.dataset.open;
+    if (!target) return;
+    if (target === 'profile') { setProfilePanel(true); return; }
+    setSection(target, true);
+    document.getElementById(target)?.scrollIntoView({ block: 'nearest' });
+    const field = document.querySelector(`#${target} input, #${target} textarea`);
+    if (field) field.focus();
+  });
+}
 
 // ── FIRST RUN ─────────────────────────────────────────────────────────────────
 // The markup's defaults suit a configured app: fetch settings and journals open,
@@ -4237,9 +4837,15 @@ function openWhatIsMissing() {
   const sidebar = document.getElementById('sidebar');
   const btn     = document.getElementById('sidebar-toggle-btn');
 
+  // The chevrons point the way the sidebar will go, so the icon states which
+  // of the two things a click will do rather than naming the panel.
+  const CHEV_IN  = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 6 7 12 13 18"/><polyline points="18 6 12 12 18 18"/></svg>';
+  const CHEV_OUT = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 6 17 12 11 18"/><polyline points="6 6 12 12 6 18"/></svg>';
+
   const paint = hidden => {
     sidebar.classList.toggle('hidden', hidden);
     const label = hidden ? 'Show the sidebar' : 'Hide the sidebar';
+    btn.innerHTML = hidden ? CHEV_OUT : CHEV_IN;
     btn.setAttribute('aria-label', label);
     btn.setAttribute('aria-expanded', String(!hidden));
     btn.dataset.tip = label;
@@ -4282,14 +4888,18 @@ function setProfilePanel(wanted) {
 // ── VERSION STAMP ─────────────────────────────────────────────────────────────
 // Populate version-bearing elements from the single VERSION constant above.
 document.title = `LitMonitor Earth ${VERSION}`;
+(() => {
+  const mark = document.querySelector('.rail-mark');
+  if (mark) mark.dataset.tip = `LitMonitor Earth ${VERSION}`;
+})();
 document.getElementById('app-footer').innerHTML =
-  `LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026`;
+  `LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026`;
 
 buildJournalList();
-// Profile is open by default — loadState() may override this if user previously collapsed it
 loadState();
 syncSliders();        // loadState writes the sources directly and fires no change event
 growAllTextareas();   // and it fills the textareas, which then have to be resized
+bindEmptyStateSteps();
 openWhatIsMissing();  // and it tells us whether this is a first run
 loadScoreCache();
 loadFeed();
@@ -4400,8 +5010,8 @@ document.getElementById('stop-btn').addEventListener('click', () => {
 ['context-input', 'api-key-input', 'prioritize-input', 'methods-input', 'downgrade-input', 'authors-input', 'days-back', 'haiku-threshold', 'abstract-chars'].forEach(id => {
   document.getElementById(id).addEventListener('change', saveSettings);
 });
-document.getElementById('load-terms-link').addEventListener('click', e => {
-  e.preventDefault();
+// The pill has to follow the field as it is typed, not only when it commits.
+document.getElementById('load-terms-link').addEventListener('click', () => {
   const box = document.getElementById('domain-terms-input');
   if (box.value.trim() && !confirm('Replace the current terms with the suggested list?')) return;
   box.value = DEFAULT_DOMAIN_TERMS.join('\n');
@@ -4437,6 +5047,9 @@ document.getElementById('custom-journals-input').addEventListener('input', () =>
   }
 
   resizer.addEventListener('mousedown', e => {
+    // The toggle sits on the divider; pressing it is not the start of a drag.
+    if (e.target.closest('#sidebar-toggle-btn')) return;
+    if (sidebar.classList.contains('hidden')) return;
     e.preventDefault();
     const startX     = e.clientX;
     const startWidth = sidebar.offsetWidth;
@@ -4459,7 +5072,7 @@ document.getElementById('custom-journals-input').addEventListener('input', () =>
   });
 })();
 
-// Character counter for Research Context
+// Character counter for Research context
 (function() {
   const contextEl = document.getElementById('context-input');
   const countEl   = document.getElementById('context-count');
@@ -4480,7 +5093,7 @@ document.getElementById('export-btn').addEventListener('click', exportVisible);
 document.getElementById('brief-btn').addEventListener('click', async () => {
   const briefBtn = document.getElementById('brief-btn');
   const apiKey   = document.getElementById('api-key-input').value.trim();
-  if (!apiKey) { showError('Enter your Anthropic API key under LLM API Key in the sidebar.'); return; }
+  if (!apiKey) { showError('Enter your Anthropic API key under LLM API key in the sidebar.'); return; }
 
   const visible = getVisiblePapers();  // honours current filter, min-score, and search
   if (!visible.length) { showError('No papers are currently shown — nothing to brief.'); return; }
@@ -4509,6 +5122,7 @@ document.getElementById('brief-btn').addEventListener('click', async () => {
   win.document.write(`<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+${pageIcon()}
 <title>Generating Brief…</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap" rel="stylesheet">
@@ -4531,7 +5145,7 @@ document.getElementById('brief-btn').addEventListener('click', async () => {
     <div class="wordmark"><span class="wm-monitor">LitMonitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Research Brief</span></div>
   </div>
   <p class="loading">Generating briefs for ${toBrief.length} paper${toBrief.length !== 1 ? 's' : ''} — please wait…</p>
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
 </div></body></html>`);
 
   setRailBusy(briefBtn, true, 'Generating the Brief…');
@@ -4639,7 +5253,6 @@ ${paperList}`;
 
     // themeVars was resolved before window.open() above.
     const cards = allCapped.map((p) => {
-      const scoreCol  = pageScoreColour(p.score);
       const titleHtml = p.link
         ? `<a href="${p.link}" target="_blank" rel="noopener">${escHtml(p.title)}</a>`
         : escHtml(p.title);
@@ -4668,7 +5281,7 @@ ${paperList}`;
 
       return `<div class="card">
   <div class="card-header">
-    <span class="score-badge" style="color:${scoreCol};border-color:${scoreCol}">${p.score}</span>
+    <span class="score-badge ${scoreClass(p.score)}">${p.score}</span>
     <div class="card-title">${titleHtml}</div>
   </div>
   <div class="card-meta">${escHtml(p.journal)}${mo ? ' &middot; ' + escHtml(mo) : ''}${auth ? ' &middot; ' + escHtml(auth) : ''}</div>
@@ -4683,6 +5296,7 @@ ${paperList}`;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+${pageIcon()}
 <title>Research Brief — ${dateStr}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap" rel="stylesheet">
@@ -4697,14 +5311,14 @@ ${paperList}`;
   .wm-earth{color:var(--accent);font-style:italic}
   .wm-sub{font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text2);font-style:normal;vertical-align:middle;margin-left:0.4rem}
   .dateline{font-size:0.78rem;color:var(--text2)}
-  .notice{font-size:0.8rem;color:var(--amber);background:color-mix(in srgb, var(--amber) 8%, transparent);border:1px solid color-mix(in srgb, var(--amber) 24%, transparent);border-radius:var(--radius-sm);padding:0.5rem 0.8rem;margin-bottom:1.5rem}
+  .notice{font-size:0.8rem;color:var(--amber-text);background:color-mix(in srgb, var(--amber) 9%, transparent);border:1px solid color-mix(in srgb, var(--amber) 25%, transparent);border-radius:var(--radius-sm);padding:0.5rem 0.8rem;margin-bottom:1.5rem}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.3rem;margin-bottom:1rem}
   .card-header{display:flex;gap:0.75rem;align-items:flex-start;margin-bottom:0.3rem}
-  .score-badge{flex-shrink:0;font-weight:700;font-size:0.8rem;border:1.5px solid;border-radius:var(--radius-sm);padding:1px 6px;line-height:1.6;margin-top:1px}
+${PAGE_SCORE_CSS}
   .card-title{font-size:0.95rem;font-weight:600;line-height:1.4;color:var(--text)}
   .card-title a{color:var(--accent);text-decoration:none}
   .card-title a:hover{text-decoration:underline}
-  .card-meta{font-size:0.75rem;color:var(--text2);margin-bottom:0.7rem;padding-left:2.2rem}
+  .card-meta{font-size:0.75rem;color:var(--text2);margin-bottom:0.5rem;padding-left:2.2rem}
   .card-brief{padding-left:2.2rem;margin-bottom:0.3rem}
   .brief-bullets{margin:0;padding-left:1rem;list-style:disc}
   .brief-bullets li{font-size:0.87rem;line-height:1.6;color:var(--text);margin-bottom:0.3rem}
@@ -4730,7 +5344,7 @@ ${paperList}`;
   </div>
   ${omitted > 0 ? `<div class="notice">${omitted} additional paper${omitted > 1 ? 's were' : ' was'} shown but not included (brief cap is ${MAX_PAPERS}). Raise your min score to reduce the list.</div>` : ''}
   ${cards}
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
@@ -4747,8 +5361,8 @@ document.querySelectorAll('.copy-cite-btn').forEach(function(btn){btn.addEventLi
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
   } catch (err) {
-    const errHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title>
-<style>:root{${themeVars}}body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:3rem;color:var(--red);background:var(--bg)}</style>
+    const errHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title>${pageIcon()}
+<style>:root{${themeVars}}body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:3rem;color:var(--red-text);background:var(--bg)}</style>
 </head><body><p><strong>Brief generation failed:</strong> ${escHtml(err.message)}</p></body></html>`;
     const errBlob = new Blob([errHtml], { type: 'text/html' });
     win.location.replace(URL.createObjectURL(errBlob));
@@ -4757,42 +5371,67 @@ document.querySelectorAll('.copy-cite-btn').forEach(function(btn){btn.addEventLi
   }
 });
 
-// Theme toggle
-// Light is now the default and dark the stored opt-in, the reverse of every
-// release up to v2.91. Both stored values are still understood, so a browser
-// holding 'light' or 'dark' from an earlier version lands where it did before.
+// ── THEME ─────────────────────────────────────────────────────────────────────
+// Three states, not two. "System" follows the OS and keeps following it, so a
+// machine that turns dark in the evening turns this dark with it and the button
+// never has to be touched. It is the default for a browser that has not chosen,
+// which is also what fixes a first-run visitor on a dark OS being shown light.
+//
+// 'light' and 'dark' from any earlier release still mean exactly what they did;
+// only the absence of a stored value has changed meaning, from light to system.
 const ICON_SUN  = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const ICON_MOON = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+// Half filled: the usual glyph for "whatever the system says".
+const ICON_AUTO = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></svg>';
+
+const THEME_MODES = ['system', 'light', 'dark'];
+const THEME_ICON  = { system: ICON_AUTO, light: ICON_SUN, dark: ICON_MOON };
+const THEME_NAME  = { system: 'System', light: 'Light', dark: 'Dark' };
+
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function storedThemeMode() {
+  const v = localStorage.getItem('litmonitor_theme');
+  return THEME_MODES.includes(v) ? v : 'system';
+}
+
+// The attribute is always concrete, never "system": everything downstream —
+// the CSS, color-scheme, and the palette the generated pages read off the live
+// document — asks whether it is dark, and should not have to resolve a mode.
+function applyThemeMode(mode) {
+  const dark = mode === 'dark' || (mode === 'system' && prefersDark.matches);
+  if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+}
 
 (function() {
   const btn = document.getElementById('theme-toggle-btn');
 
-  // The icon shows what a click switches *to*, which is why dark mode shows a
-  // sun. The label and tooltip say the same thing, since the icon alone has no
-  // accessible name.
-  const paint = () => {
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const label = dark ? 'Switch to light theme' : 'Switch to dark theme';
-    btn.innerHTML = (dark ? ICON_SUN : ICON_MOON);
-    btn.setAttribute('aria-label', label);
-    btn.dataset.tip = label;
+  // The icon shows the mode that is in force, and the tooltip says what it
+  // means and what a click will do — three states are too many to read off a
+  // single glyph otherwise.
+  const paint = mode => {
+    applyThemeMode(mode);
+    const next = THEME_MODES[(THEME_MODES.indexOf(mode) + 1) % THEME_MODES.length];
+    const what = mode === 'system'
+      ? 'Theme: System'
+      : `Theme: ${THEME_NAME[mode]}`;
+    btn.innerHTML = THEME_ICON[mode];
+    btn.setAttribute('aria-label', `${what}. Click for ${THEME_NAME[next]}.`);
+    btn.dataset.tip = what;
   };
 
-  if (localStorage.getItem('litmonitor_theme') === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
-  paint();
+  paint(storedThemeMode());
 
   btn.addEventListener('click', () => {
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (dark) {
-      document.documentElement.removeAttribute('data-theme');
-      lsSet('litmonitor_theme', 'light');
-    } else {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      lsSet('litmonitor_theme', 'dark');
-    }
-    paint();
+    const next = THEME_MODES[(THEME_MODES.indexOf(storedThemeMode()) + 1) % THEME_MODES.length];
+    lsSet('litmonitor_theme', next);
+    paint(next);
+  });
+
+  // Following the OS means following it while the app is open, not only at load.
+  prefersDark.addEventListener('change', () => {
+    if (storedThemeMode() === 'system') paint('system');
   });
 })();
 
@@ -4846,13 +5485,14 @@ function openDocs() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+${pageIcon()}
 <title>LitMonitor Earth — Documentation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap" rel="stylesheet">
 <style>
   :root{${themeVars}}
   *,*::before,*::after{box-sizing:border-box}
-  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.7;color:var(--text);background:var(--bg);margin:0;padding:2.5rem 1.5rem 6rem}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.65;color:var(--text);background:var(--bg);margin:0;padding:2.5rem 1.5rem 6rem}
   .wrap{max-width:720px;margin:0 auto}
   .masthead{margin-bottom:2rem;border-bottom:2px solid var(--text);padding-bottom:0.8rem}
   .wordmark{font-size:21px;font-weight:700;letter-spacing:-0.03em;color:var(--text);margin-bottom:0.25rem}
@@ -4881,17 +5521,20 @@ function openDocs() {
   .field-body p{margin:0 0 0.5rem}
   .field-body p:last-child{margin-bottom:0}
   /* score chips */
-  .chip{display:inline-block;font-size:0.72rem;font-weight:700;padding:1px 7px;border-radius:3px;border:1.5px solid;margin-right:4px;vertical-align:middle}
-  .chip-hi{color:var(--accent);border-color:var(--accent)}
-  .chip-mid{color:var(--amber);border-color:var(--amber)}
-  .chip-lo{color:var(--red);border-color:var(--red)}
+  .chip{display:inline-block;font-size:0.72rem;font-weight:700;padding:1px 7px;border-radius:var(--radius-sm);border:1.5px solid;margin-right:4px;vertical-align:middle}
+  .chip-hi{color:var(--score-hi);border-color:var(--score-hi)}
+  .chip-mid{color:var(--score-mid);border-color:var(--score-mid)}
+  .chip-lo{color:var(--score-lo);border-color:var(--score-lo)}
   /* tip box */
-  .tip{background:var(--surface);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:0.6rem 1rem;margin:0.8rem 0;font-size:0.85rem;color:var(--text2)}
+  .tip{background:var(--surface);border-left:3px solid var(--accent);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:0.6rem 1rem;margin:0.8rem 0;font-size:0.85rem;color:var(--text2)}
   .tip strong{color:var(--text)}
   /* kbd */
-  kbd{font-family:system-ui,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--text2)}
+  kbd{font-family:system-ui,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1px 5px;color:var(--text2)}
   /* inline label */
   .ui-label{font-family:system-ui,monospace;font-size:0.8rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 8px;color:var(--text);white-space:nowrap}
+  /* The rail's SVGs carry their own width and height attributes for a 38px
+     button; in running text they take the type size instead. */
+  .ui-label svg{width:1.05em;height:1.05em;vertical-align:-0.17em;margin-right:0.3em}
   footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
   .dl-btn{position:fixed;top:1rem;right:1rem;background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--radius-sm);padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 </style>
@@ -4919,7 +5562,7 @@ function openDocs() {
       <li><a href="#results">Reading Results</a></li>
       <li><a href="#filter">Filter &amp; Search</a></li>
       <li><a href="#export">Export</a></li>
-      <li><a href="#brief">&#10022; Research Brief</a></li>
+      <li><a href="#brief">Research Brief</a></li>
       <li><a href="#tips">Tips &amp; Best Practices</a></li>
     </ol>
   </div>
@@ -4936,16 +5579,16 @@ function openDocs() {
     <h2>2. Getting Started</h2>
 
     <h3>Step 1 — Get an Anthropic API key</h3>
-    <p>LitMonitor uses the Claude API to score papers. You need an Anthropic API key from <strong>console.anthropic.com</strong>. Paste it into the <span class="ui-label">LLM API Key</span> section at the foot of the sidebar — it is an accordion, collapsed until you open it. The key is stored in your browser's local storage and is never sent anywhere except directly to the Anthropic API.</p>
+    <p>LitMonitor uses the Claude API to score papers. You need an Anthropic API key from <strong>console.anthropic.com</strong>. Paste it into the <span class="ui-label">LLM API key</span> section at the foot of the sidebar — it is an accordion, collapsed until you open it. The key is stored in your browser's local storage and is never sent anywhere except directly to the Anthropic API.</p>
 
-    <h3>Step 2 — Fill in your Research Profile</h3>
-    <p>Click the <span class="ui-label">person icon</span> in the left rail to open the <span class="ui-label">Research profile</span> panel. Fill in at least the <em>Prioritize</em> or <em>Transferable Methods</em> fields. The more specific your profile, the more useful the scores will be. See <a href="#profile">Section 4</a> for details on each field.</p>
+    <h3>Step 2 — Fill in your research profile</h3>
+    <p>Click the <span class="ui-label">${railIcon('profile-btn')}Research profile</span> button in the left rail to open the panel. Fill in at least the <em>Prioritize</em> or <em>Transferable methods</em> fields. The more specific your profile, the more useful the scores will be. See <a href="#profile">Section 4</a> for details on each field.</p>
 
     <h3>Step 3 — Select journals</h3>
-    <p>Scroll down to the <span class="ui-label">Journals</span> section and check the sources you want to monitor. All journals are checked by default. The high-volume arXiv feeds (cs.LG, cs.AI, stat.ML) are filtered by the <span class="ui-label">arXiv.cs filter</span> before anything is scored, so leaving them checked is far cheaper than it used to be.</p>
+    <p>Scroll down to the <span class="ui-label">Journals</span> section and check the sources you want to monitor. All journals are checked by default. The high-volume arXiv feeds (cs.LG, cs.AI, stat.ML) are filtered by the <span class="ui-label">arXiv.cs filter</span> before anything is scored, so leaving them checked costs little.</p>
 
     <h3>Step 4 — Fetch &amp; Score</h3>
-    <p>Click the <span class="ui-label">&#8595; Fetch &amp; Score</span> button. LitMonitor will pull recent papers from each selected source and then ask Claude to score them for you. Results appear as scored cards in the main feed, sorted highest score first.</p>
+    <p>Click the <span class="ui-label">Fetch &amp; Score</span> button. LitMonitor will pull recent papers from each selected source and then ask Claude to score them for you. Results appear as scored cards in the main feed, sorted highest score first.</p>
   </div>
 
   <!-- 3. SETTINGS -->
@@ -4955,27 +5598,27 @@ function openDocs() {
     <div class="field-card">
       <div class="field-name">Fetch days back</div>
       <div class="field-body">
-        <p>How many calendar days back to look when fetching papers. A value of <strong>2</strong> fetches papers published in the last two days. Increase to catch up after a weekend or holiday.</p>
-        <p>Choose <strong>Auto</strong> to use the gap since the last successful run, rounded up and capped at 30 days. The window it resolves to is shown in the status line while the run is fetching. Only a run that finishes without a failed feed advances that clock, so a run where a source failed does not skip the papers it never fetched.</p>
-        <p>arXiv RSS feeds return only the current announcement batch regardless of date, so larger values mainly affect the OpenAlex journal fetches.</p>
+        <p>How far back to look. The slider covers <strong>1&ndash;30 days</strong>, with <strong>Auto</strong> at its left-hand stop; type into the box for any window up to 99 days, or type <em>Auto</em>.</p>
+        <p><strong>Auto</strong> uses the gap since the last successful run, rounded up, capped at 30 days, and reported in the status line. A run where a source failed does not count as successful, so its days are asked for again.</p>
+        <p>The window applies to arXiv too. arXiv is asked for papers submitted inside it, rather than for its RSS feed, which carries only the current announcement batch &mdash; so a day missed because a run failed or did not happen is picked up by the next successful run.</p>
       </div>
     </div>
 
     <div class="field-card">
-      <div class="field-name">&#9889; Haiku Prefilter (button + threshold)</div>
+      <div class="field-name">Haiku prefilter</div>
       <div class="field-body">
-        <p>The <span class="ui-label">Haiku prefilter</span> checkbox, under <span class="ui-label">Fetch &amp; Score</span> in the sidebar, activates a two-pass scoring pipeline. It is <strong>on by default</strong> and is the primary cost-saving mechanism. The <span class="ui-label">Drop if Haiku scores &le;</span> slider beneath it is disabled while the checkbox is off, because the threshold means nothing without the pass that applies it.</p>
-        <p><strong>Pass 1 (Haiku):</strong> All uncached papers are scored quickly and cheaply by Claude Haiku. Any paper scoring at or below the <em>Haiku drop if &#8804;</em> threshold is discarded without being sent to Sonnet. Haiku scores are cached, rejected papers included, so an overlapping fetch window never re-pays Haiku for the same paper. Because the cached Haiku score is compared against the <em>current</em> threshold, changing the threshold re-decides cached papers without any API call.</p>
+        <p>A two-pass pipeline, <strong>on by default</strong>, and the main way to keep a run cheap. The <span class="ui-label">Drop if Haiku scores &le;</span> slider below it is disabled while the checkbox is off.</p>
+        <p><strong>Pass 1 (Haiku):</strong> All uncached papers are scored quickly and cheaply by Claude Haiku. Any paper scoring at or below the threshold is discarded without being sent to Sonnet. Haiku scores are cached, rejections included, and are re-tested against the current threshold — so changing the threshold re-decides cached papers with no API call.</p>
         <p><strong>Pass 2 (Sonnet):</strong> Only the survivors are scored by Claude Sonnet, which provides the final scores you see in the feed.</p>
-        <p>The <span class="ui-label">Haiku drop if &#8804;</span> setting (default: 3) controls the cutoff. Raise it to filter more aggressively (saves more cost but risks dropping borderline papers); lower it to be more conservative.</p>
+        <p>The threshold defaults to <strong>5</strong>. Raise it to filter more aggressively, at the risk of dropping a borderline paper; lower it to be more conservative.</p>
       </div>
     </div>
 
     <div class="field-card">
       <div class="field-name">Abstract chars (scoring)</div>
       <div class="field-body">
-        <p>Controls how many characters of each paper's abstract are sent to Haiku and Sonnet during scoring. Options: <strong>300</strong>, <strong>500</strong>, <strong>800</strong>, <strong>1000</strong>, <strong>1500</strong>, or <strong>&#8734; all</strong> (default). Lower it if a run costs more than expected — abstracts dominate the input tokens, and the Haiku prefilter sends every fetched paper.</p>
-        <p>Most of the relevance signal is in the first few hundred characters of an abstract, so truncating saves input tokens without meaningfully affecting score quality. This setting only applies to scoring — the full abstract is always used for &#10022; Research Brief generation and for the inline abstract toggle in the feed.</p>
+        <p>How much of each abstract is sent for scoring: <strong>500</strong>, <strong>1000</strong>, <strong>1500</strong>, <strong>2000</strong>, <strong>2500</strong> or <strong>All</strong> (default). A typical abstract runs about 1,700 characters. Lower it if a run costs more than expected: abstracts dominate the input tokens, and the prefilter sends every fetched paper.</p>
+    <p>Scoring only &mdash; the full abstract is always used on the card and in the Brief.</p>
       </div>
     </div>
 
@@ -4992,10 +5635,9 @@ function openDocs() {
   <div class="doc-section" id="profile">
     <h2>4. Research Profile</h2>
     <p>The profile tells Claude who you are and what to prioritize. It is assembled into a prompt sent with every scoring request. All fields are optional but the more you fill in, the more accurate the scores.</p>
-    <p>It opens from the <span class="ui-label">person icon</span> in the left rail. It is a panel rather than part of the sidebar because it is set once and then left alone for months; opening it narrows the feed rather than covering it, and Escape closes it. Every field saves as you type.</p>
-
     <div class="field-card">
-      <div class="field-name">Research Context <span style="font-weight:normal;text-transform:none;letter-spacing:normal;font-size:0.8rem">(max 160 chars)</span></div>
+      <p>The panel opens from the <span class="ui-label">${railIcon('profile-btn')}Research profile</span> button in the left rail. Fields save as you type; Escape closes it.</p>
+      <div class="field-name">Research context <span style="font-weight:normal;text-transform:none;letter-spacing:normal;font-size:0.8rem">(max 160 chars)</span></div>
       <div class="field-body">
         <p>A one-sentence description of who you are and what you work on. This is used as background context for all scoring decisions. Keep it concise — it has a 160-character limit. Example: <em>"I am a climate scientist with extensive AI knowledge working at the intersection of machine learning and climate/earth science."</em></p>
       </div>
@@ -5010,25 +5652,25 @@ function openDocs() {
     </div>
 
     <div class="field-card">
-      <div class="field-name">Transferable Methods <span class="chip chip-hi">8–10</span></div>
+      <div class="field-name">Transferable methods <span class="chip chip-hi">8–10</span></div>
       <div class="field-body">
         <p>Methods or techniques from <em>outside</em> your field that you would find useful if they were applied to your domain. Papers advancing these techniques on spatial, temporal, or spatiotemporal data — even in a different domain — will score 8–10 if the method would transfer naturally to earth/climate science.</p>
-        <p>This is distinct from Prioritize: use Prioritize for what you directly work on; use Transferable Methods for techniques you are watching from adjacent fields (e.g., uncertainty quantification, representation learning, OOD detection).</p>
+        <p>This is distinct from Prioritize: use Prioritize for what you directly work on; use Transferable methods for techniques you are watching from adjacent fields (e.g., uncertainty quantification, representation learning, OOD detection).</p>
       </div>
     </div>
 
     <div class="field-card">
       <div class="field-name">Downgrade <span class="chip chip-lo">1–4</span></div>
       <div class="field-body">
-        <p>Topics or paper types you are <em>not</em> interested in. Papers matching items on this list will score 1–4 unless they also strongly match a Prioritize or Transferable Methods item. Use this to suppress high-volume topics that appear in your journals but aren't relevant to your work.</p>
+        <p>Topics or paper types you are <em>not</em> interested in. Papers matching items on this list will score 1–4 unless they also strongly match a Prioritize or Transferable methods item. Use this to suppress high-volume topics that appear in your journals but aren't relevant to your work.</p>
         <p>Examples: <em>"Purely observational studies with no ML component"</em>, <em>"Standard numerical weather prediction without novel AI"</em>, <em>"Regional case studies without generalizable methods"</em>.</p>
       </div>
     </div>
 
     <div class="field-card">
-      <div class="field-name">Priority Authors <span class="chip chip-hi">8–10</span></div>
+      <div class="field-name">Priority authors <span class="chip chip-hi">8–10</span></div>
       <div class="field-body">
-        <p>Names of researchers whose papers you always want to see, regardless of topic. One name per line. Papers with any matching author — including co-authors — will score 8–10. Claude uses fuzzy matching on last name and first initial, so minor name variations are handled gracefully.</p>
+        <p>Researchers whose papers you always want to see, one name per line. Matching happens in your browser on surname plus first initial, ignoring accents, and accepts both <em>Elizabeth A. Barnes</em> and <em>Barnes, Elizabeth A.</em>; a surname alone matches any first initial. A matched paper skips the Haiku prefilter, scores at least 8, and carries a <span class="ui-label">priority author</span> tag.</p>
       </div>
     </div>
   </div>
@@ -5038,13 +5680,11 @@ function openDocs() {
     <h2>5. How Scoring Works</h2>
     <p>Papers are scored 1–10 by Claude Sonnet (or Haiku in the prefilter pass) using your assembled profile. Papers are sent in batches of 20. Each paper's title, authors, journal, and abstract are provided. Claude returns a score and a one-sentence reason for each paper.</p>
     <p><strong>Score caching:</strong> Once a paper has been scored by Sonnet, its score and reason are saved in your browser's local storage under a score cache. On subsequent runs, any paper already in the cache is displayed immediately without making an API call — so re-running across overlapping date windows costs nothing for papers you have already scored. The cache is cleared along with the rest of the app cache when you click <span class="ui-label">Clear cache</span>.</p>
-    <p><strong>Cache entries are tied to your profile.</strong> A score only means something relative to the profile it was scored against, so each entry is keyed by the paper plus a fingerprint of your Research Context, Prioritize, Transferable Methods, Downgrade, and Priority Authors text. Editing any of those re-scores affected papers automatically on the next run; leaving them alone reuses the cache as before. The <em>Abstract chars</em> setting is deliberately not part of the fingerprint, since it is a cost control rather than a change of research intent.</p>
+    <p><strong>Cache entries are tied to your profile.</strong> A score only means something relative to the profile it was scored against, so each entry is keyed by the paper plus a fingerprint of your Research context, Prioritize, Transferable methods, Downgrade, and Priority authors text. The fingerprint covers the whole profile, so editing any of them re-scores every paper on the next run; leaving them alone reuses the cache as before. The <em>Abstract chars</em> setting is deliberately not part of the fingerprint, since it is a cost control rather than a change of research intent.</p>
     <p><strong>Cache pruning:</strong> Entries older than 180 days are dropped when the app loads, and the seen/dismissed lists are capped at 20,000 papers each, so storage cannot grow without bound. If browser storage does fill up anyway, the app says so in the error area and appends a warning to the status line, which is not cleared between runs.</p>
-    <p><strong>Earlier versions:</strong> caches written by v2.80 and earlier used a different key format and are not reused, but they are also not deleted, since browsers share local storage between local files and removing them would break an older version you still have open. <span class="ui-label">Clear cache</span> removes them.</p>
-
     <h3>Score ranges</h3>
     <p>
-      <span class="chip chip-hi">8–10</span> Directly on-topic — strong match to Prioritize, Transferable Methods, or a Priority Author.<br>
+      <span class="chip chip-hi">8–10</span> Directly on-topic — strong match to Prioritize, Transferable methods, or a Priority Author.<br>
       <span class="chip chip-mid">5–7</span> Peripherally relevant — related but not a strong match; might inform your work.<br>
       <span class="chip chip-lo">1–4</span> Not relevant — matches Downgrade topics or has no meaningful connection to your profile.
     </p>
@@ -5060,8 +5700,8 @@ function openDocs() {
   <div class="doc-section" id="journals">
     <h2>6. Journals</h2>
     <p>Each source in the journal list has a small badge showing how it is fetched:</p>
-    <p><strong>api</strong> — fetched directly from the OpenAlex API (open scholarly database). Reliable, no third-party proxy needed. Abstracts are included when available.</p>
-    <p><strong>rss</strong> — fetched via an arXiv RSS feed through a CORS proxy. arXiv feeds are category-exact (e.g. cs.LG returns every paper cross-listed under cs.LG). These feeds can be very large; deselecting them reduces both run time and API cost.</p>
+    <p><strong>api</strong> — fetched directly from the OpenAlex API (open scholarly database). Reliable, no relay needed. Abstracts are included when available.</p>
+    <p><strong>relay</strong> &mdash; an arXiv category, fetched through a relay because arXiv does not allow a browser to read it directly. It is asked for the <em>Fetch days back</em> window, as section 3 describes. Categories are exact (cs.LG returns every paper cross-listed under cs.LG) and can be very large.</p>
     <p>Use the <span class="ui-label">All</span> and <span class="ui-label">None</span> buttons to quickly select or deselect all sources. Your selection is saved automatically.</p>
 
     <h3>Current journal list</h3>
@@ -5080,14 +5720,13 @@ function openDocs() {
   <!-- 7. FETCH & SCORE -->
   <div class="doc-section" id="fetch">
     <h2>7. Fetch &amp; Score</h2>
-    <p>Clicking <span class="ui-label">&#8595; Fetch &amp; Score</span> runs the full pipeline:</p>
-    <p><strong>1. Fetch</strong> — Papers are pulled from each selected journal or arXiv feed using the <em>Fetch days back</em> window. A progress bar shows each source as it loads. Sources that fail (e.g. proxy timeouts) are reported as warnings; papers from other sources still proceed. A hard cap of <strong>1,000 papers</strong> is applied after fetching to prevent runaway runs.</p>
+    <p>Clicking <span class="ui-label">Fetch &amp; Score</span> runs the full pipeline:</p>
+    <p><strong>1. Fetch</strong> — Papers are pulled from each selected journal or arXiv category using the <em>Fetch days back</em> window. A progress bar shows each source as it loads. A source that fails is reported as a warning and the others still proceed; because a failed run does not advance the last-run clock, and arXiv is asked for an explicit window, the days it covered are requested again next time rather than being lost. A hard cap of <strong>1,000 papers</strong> is applied after fetching to prevent runaway runs.</p>
     <p><strong>2. Deduplicate</strong> — Papers appearing in multiple sources (e.g. a paper cross-listed on arXiv and indexed in OpenAlex) are deduplicated by DOI or a title+date fingerprint.</p>
     <p><strong>3. Abstract enrichment</strong> — Papers without an abstract are looked up against the Semantic Scholar batch API using their DOI. Semantic Scholar has broader publisher agreements than OpenAlex, so many abstracts that OpenAlex omits (e.g. from Nature Group or AAAS journals) can be recovered here. Abstracts filled in this step are used for both scoring and brief generation.</p>
-    <p><strong>3b. Preprint deduplication</strong> — The same paper often arrives twice, once as an arXiv or EarthArXiv preprint and once as the published journal version, under different IDs. Papers with matching titles are collapsed into one card, keeping the published version's identity and link. The abstract is chosen separately: many publishers withhold abstracts from the published record while the preprint carries the full text, so whichever copy has the longer abstract wins, and the paper is never left to be scored on its title alone.</p>
     <p><strong>4. Score cache split</strong> — Papers already in the local score cache under your current profile are set aside and displayed immediately with their cached score and reason — no API call needed. Only uncached papers proceed to the next steps.</p>
     <p><strong>5. Large-batch warning</strong> — If more than 300 uncached papers remain, a confirmation dialog shows the estimated run time and gives you the option to cancel and narrow your selection.</p>
-    <p><strong>6. Score</strong> — Uncached papers are sent to Claude in batches of 20. If Haiku Prefilter is active, a fast Haiku pass runs first and drops low-scoring papers; survivors are then scored by Sonnet. New Sonnet and Haiku scores are both saved to the local caches for future runs. Each paper is returned with its own number so scores can never be attached to the wrong paper, even if the model skips one. Whatever comes back is kept, and only the papers still missing a score are re-sent, so a partial or truncated reply is never paid for twice. Papers that are still unscored after the retry are shown with score 0 and are neither cached nor marked as seen, so the next run picks them back up rather than losing them.</p>
+    <p><strong>6. Score</strong> — Uncached papers are sent to Claude in batches of 20. If the Haiku prefilter is active, a fast Haiku pass runs first and drops low-scoring papers; survivors are then scored by Sonnet. New Sonnet and Haiku scores are both saved to the local caches for future runs. Each paper is returned with its own number so scores can never be attached to the wrong paper, even if the model skips one. Whatever comes back is kept, and only the papers still missing a score are re-sent, so a partial or truncated reply is never paid for twice. Papers that are still unscored after the retry are shown with score 0 and are neither cached nor marked as seen, so the next run picks them back up rather than losing them.</p>
     <p><strong>7. Results</strong> — All papers (cached + newly scored) are merged and displayed sorted by score, highest first. The status bar shows when the last run completed and how many papers were scored. At any point during steps 1–6 you can click the red <span class="ui-label">&#9632; Stop</span> button in the sidebar head to halt the run early; papers scored up to that point are shown normally.</p>
     <div class="tip"><strong>New vs. seen:</strong> LitMonitor tracks every paper ID it has ever scored. Papers not seen in a previous run get a ring around their score badge, and that marking persists across browser sessions until you clear the cache.</div>
   </div>
@@ -5097,18 +5736,14 @@ function openDocs() {
     <h2>8. Reading Results</h2>
 
     <h3>The left rail</h3>
-    <p>The narrow strip on the far left holds six icon buttons; hovering any of them names it. From the top: <strong>collapse the sidebar</strong>, then a rule, then <strong>Export</strong> and <strong>&#10022; Research Brief</strong>, which act on the papers currently shown and say how many in their hover text. Pinned to the foot: <strong>Research profile</strong>, <strong>Documentation</strong> and the <strong>theme</strong> toggle.</p>
-    <p><span class="ui-label">Clear cache</span> is deliberately not in the rail. It is destructive, and an unlabelled icon is the wrong thing to hang that on; it stays at the foot of the sidebar with a label.</p>
-
+    <p>From the top: <span class="ui-label">${railIcon('brief-btn')}Research Brief</span> and <span class="ui-label">${railIcon('export-btn')}Export</span>, which act on the papers currently shown and say how many in their hover text. At the foot: <span class="ui-label">${railIcon('profile-btn')}Research profile</span>, the theme control, and <span class="ui-label">${railIcon('docs-btn')}Documentation</span>. Hovering any of them names it.</p>
     <h3>Stats bar</h3>
     <p>Above the paper cards, a stats bar shows: <strong>Fetched</strong> (total papers scored this run), <strong>Shown</strong> (papers passing the current min-score and filter), <strong>New</strong> (papers not seen in any previous run), and <strong>Score&#8805;8</strong> (high-relevance count).</p>
 
     <h3>Score badge</h3>
-    <p>Each card carries a score badge at the top of its left-hand rail. <span class="chip chip-hi">9</span> green = highly relevant, <span class="chip chip-mid">6</span> amber = peripheral, <span class="chip chip-lo">3</span> grey = not relevant. The badge uses the same thresholds as the <span class="ui-label">Score &#8805; N</span> filter.</p>
-    <p>Colour in that rail means the score band and nothing else. The journal and date are plain text and the <strong>priority author</strong> tag is grey, so nothing there competes with the badge for the same three colours.</p>
-
+    <p>Each card carries a score badge at the top of its left-hand rail. <span class="chip chip-hi">9</span> green = highly relevant, <span class="chip chip-mid">6</span> amber = peripheral, <span class="chip chip-lo">3</span> grey = not relevant. The bands are 8&ndash;10, 6&ndash;7 and 1&ndash;5; the score ranges in section 5 are the rubric Claude scores against, which reads 5&ndash;7 as peripheral.</p>
     <h3>New papers</h3>
-    <p>A paper not seen in any previous run gets a <strong>ring around its score badge</strong>, in the badge's own colour. There is no separate "new" tag: the ring is the whole signal, so it can be scanned straight down the column without adding a fourth thing for the eye to decode. The <span class="ui-label">New only</span> filter shows just those papers.</p>
+    <p>A paper not seen in any previous run gets a <strong>ring around its score badge</strong>, in the badge's own colour. <span class="ui-label">New only</span> shows just those papers.</p>
 
     <h3>Abstract</h3>
     <p>The first four lines of the abstract sit in the tinted block, which is tinted to the same score band as the badge. The preview starts at the sentence that reads like the paper's contribution rather than at its opening background, and a leading &hellip; marks where it skipped; if there is no such sentence, or skipping would swallow more than half the abstract, it starts at the beginning instead.</p>
@@ -5118,7 +5753,7 @@ function openDocs() {
     <p>Under the abstract, one sentence explains why Claude assigned the score it did. This is what you use to calibrate your profile over time.</p>
 
     <h3>Card actions</h3>
-    <p>The paper's title is a link; there is no separate open button.</p>
+    <p>The paper's title is the link to the paper.</p>
     <p><span class="ui-label">Copy citation</span> puts a formatted citation on the clipboard. A preprint is labelled as one and always carries its URL.</p>
     <p><span class="ui-label">&#9734; Star</span> keeps the paper in the <span class="ui-label">&#9733; Starred</span> view across runs, whether or not a later run fetches it again. Click again to remove it. Starred papers survive <span class="ui-label">Clear cache</span>.</p>
     <p><span class="ui-label">+ More like this</span> records the paper as a <span class="ui-label">Learned example</span>. The examples are listed in the <span class="ui-label">Research profile</span> panel and pasted verbatim into the scoring prompt as calibration for what an 8&ndash;10 looks like, so the next run scores against them. Adding one invalidates the score cache, so that run re-scores rather than mixing old and new judgements.</p>
@@ -5128,7 +5763,7 @@ function openDocs() {
   <!-- 9. FILTER & SEARCH -->
   <div class="doc-section" id="filter">
     <h2>9. Filter &amp; Search</h2>
-    <p>The <span class="ui-label">Filter &amp; Sort</span> card reads left to right: <span class="ui-label">All</span>, <span class="ui-label">New only</span>, the score floor, then <span class="ui-label">&#9733; Starred</span>, with search at the right.</p>
+    <p>The <span class="ui-label">Filter &amp; sort</span> card reads left to right: <span class="ui-label">All</span>, <span class="ui-label">New only</span>, the score floor, then <span class="ui-label">&#9733; Starred</span>, with search at the right.</p>
     <p><span class="ui-label">All</span> shows every paper at or above the score floor. <span class="ui-label">New only</span> restricts the feed to papers not seen in any previous run — the same ones carrying a ring round the score badge.</p>
     <p>The <span class="ui-label">Score &#8805; N</span> control sets the minimum. Papers scoring below it are fetched and scored but not displayed. The default is <strong>Score &#8805; 6</strong>. It sits immediately before <span class="ui-label">&#9733; Starred</span> because that is the one view it does not apply to, and it is disabled there: an explicit star outranks the floor, so a starred paper shows whatever it scored.</p>
     <p>The search box filters by title and author name simultaneously, in the starred view as well. Results update as you type.</p>
@@ -5138,19 +5773,18 @@ function openDocs() {
   <!-- 10. EXPORT -->
   <div class="doc-section" id="export">
     <h2>10. Export</h2>
-    <p>The <span class="ui-label">&#8595; Export</span> button opens a new browser tab containing a styled HTML report of all currently visible papers (respecting min score, filter, and search). The exported page includes title, journal, authors, date, Claude's relevance reason, and a collapsible abstract for each paper. A <em>Download</em> button on the export page saves the report as a self-contained HTML file you can archive or share.</p>
-    <p>The export page is painted with whatever colours the app is using at the moment you press the button, reading them off the live page rather than keeping its own copy of the palette.</p>
-  </div>
+    <p>The <span class="ui-label">${railIcon('export-btn')}Export</span> button opens a new browser tab containing a styled HTML report of all currently visible papers (respecting min score, filter, and search). The exported page includes title, journal, authors, date, Claude's relevance reason, and a collapsible abstract for each paper. A <em>Download</em> button on the export page saves the report as a self-contained HTML file you can archive or share.</p>
+    </div>
 
   <!-- 11. BRIEF -->
   <div class="doc-section" id="brief">
-    <h2>11. &#10022; Research Brief</h2>
-    <p>The <span class="ui-label" title="Costs one Sonnet call">&#9889; &#10022; Brief</span> button generates a personalized narrative brief for each visible paper — up to 20 at a time. For each paper with an abstract, Claude produces 2–3 bullet points:</p>
+    <h2>11. Research Brief</h2>
+    <p>The <span class="ui-label" title="Costs one Sonnet call">${railIcon('brief-btn')}Research Brief</span> button asks Sonnet for two or three bullets on each shown paper &mdash; up to <strong>50</strong> per run, in one call. Papers beyond 50 are omitted and a notice says so.</p>
     <p><strong>Bullet 1</strong> — What is interesting, innovative, or important about this specific paper: a concrete finding, method advance, or result that sets it apart from generic topic descriptions.</p>
-    <p><strong>Bullet 2 (and optionally 3)</strong> — Why it matters to <em>you specifically</em>, based on your Research Profile, and any notable caveats or connections to your work.</p>
+    <p><strong>Bullet 2 (and optionally 3)</strong> — Why it matters to <em>you specifically</em>, based on your research profile, and any notable caveats or connections to your work.</p>
     <p>Papers without an abstract are included in the brief output but show <em>No abstract available — brief not generated.</em> in place of bullets. No API call is made for those papers.</p>
     <p>The brief opens in a new tab and can be downloaded as a self-contained HTML file. Like Export, it mirrors the current app theme.</p>
-    <div class="tip"><strong>Cost note:</strong> Research Brief makes a single API call to Sonnet with up to <strong>50</strong> papers included (only those with abstracts are sent). If your visible list exceeds 50 papers, a notice is shown and the remainder are omitted — raise your min score to shorten the list.</div>
+    <div class="tip"><strong>Cost note:</strong> one Sonnet call per brief, however many papers are in it &mdash; and only papers with an abstract are sent.</div>
   </div>
 
   <!-- 12. TIPS -->
@@ -5158,27 +5792,25 @@ function openDocs() {
     <h2>12. Tips &amp; Best Practices</h2>
 
     <h3>Controlling cost</h3>
-    <p>The main cost driver is the number of papers scored. At Sonnet pricing, expect roughly <strong>$0.10–0.12 per 100 papers</strong>. A typical run across a full journal list (150–200 papers) costs $0.15–0.25. arXiv cs.LG, cs.AI, and stat.ML can each add 100–300 papers per day on their own; the <span class="ui-label">arXiv.cs filter</span> discards the ones with no earth-science application or named method before any API call, which costs nothing, so those feeds are affordable to leave checked. The &#9889; Haiku Prefilter helps further when you have many low-relevance papers to discard cheaply before Sonnet scoring. Score caching means re-running over an overlapping date window is nearly free — only papers you have not scored before incur an API call. Costs are billed directly to your Anthropic account.</p>
-    <p><strong>What you have actually spent</strong> is shown at the foot of the sidebar, beside <span class="ui-label">Clear cache</span>: the current run, the calendar-month total, and how many papers that month covers. The figures come from the token counts each Anthropic response reports, multiplied by the published rates, which the app carries as constants and states the verification date for &mdash; they are not a setting, and nothing you can change in the app alters what is fetched or scored.</p>
+    <p>The main cost driver is the number of papers scored. At Sonnet pricing, expect roughly <strong>$0.10–0.12 per 100 papers</strong>. A typical run across a full journal list (150–200 papers) costs $0.15–0.25. arXiv cs.LG, cs.AI, and stat.ML can each add 100–300 papers per day on their own; the <span class="ui-label">arXiv.cs filter</span> discards the ones with no earth-science application or named method before any API call, which costs nothing, so those feeds are affordable to leave checked. The Haiku prefilter helps further when you have many low-relevance papers to discard cheaply before Sonnet scoring. Score caching means re-running over an overlapping date window is nearly free — only papers you have not scored before incur an API call. Costs are billed directly to your Anthropic account.</p>
+    <p><strong>Cost estimate</strong>, at the foot of the sidebar, shows this run, the calendar-month total, and how many papers that total covers. Token counts are measured &mdash; every Anthropic response reports them &mdash; and are multiplied by published list rates, so the estimate is in the price, not the usage.</p>
 
     <h3>Tuning your profile</h3>
     <p>Run the tool a few times and look at papers scoring 6–7: if they feel more relevant than their score suggests, add a more specific Prioritize entry. If papers you don't care about keep appearing, add them to Downgrade. The relevance reason on each card is the best diagnostic — it tells you exactly which part of your profile Claude matched (or didn't).</p>
 
     <h3>Using New only</h3>
     <p>After your first run, use the <span class="ui-label">New only</span> filter on subsequent days to focus on papers you haven't seen before. The seen-papers cache persists across sessions so this works even if you close and reopen the app.</p>
-    <p>The feed itself also survives a reload: closing the tab and reopening the app restores the last run's papers, scores, and new-paper rings without re-fetching or re-scoring anything.</p>
-
     <h3>Clearing the cache</h3>
-    <p>The <span class="ui-label">Clear cache</span> button at the foot of the sidebar resets the seen-papers history, the dismissed-papers list, the current feed, <em>and</em> both score caches. All papers will be marked as new and re-scored from scratch on the next run. Use this if you want a completely fresh start or if browser storage has filled up. You no longer need it after revising your Research Profile — profile edits invalidate the affected cache entries on their own.</p>
+    <p>The <span class="ui-label">Clear cache</span> button at the foot of the sidebar resets the seen-papers history, the dismissed-papers list, the current feed, <em>and</em> both score caches. All papers will be marked as new and re-scored from scratch on the next run. Use this if you want a completely fresh start or if browser storage has filled up. A profile edit invalidates the score cache on its own, so it is not needed after revising the profile.</p>
 
-    <h3>Light / Dark theme</h3>
-    <p>The sun or moon icon at the foot of the left rail toggles the colour scheme; the icon shows what a click switches <em>to</em>. Light is the default. The preference is saved in local storage and persists across sessions, and the Export, Brief and Documentation pages are painted with whatever the app is using at the moment they are generated.</p>
+    <h3>Theme</h3>
+    <p>The theme control at the foot of the left rail cycles <strong>System</strong>, <strong>Light</strong>, <strong>Dark</strong>. The icon shows the mode in force — a half-filled circle for System, a sun for Light, a moon for Dark — and hovering it says what a click will do. <strong>System</strong> follows your operating system and keeps following it, so a machine that switches to dark in the evening switches this with it; it is what you get until you choose otherwise. The preference is saved in local storage and persists across sessions, and the Export, Brief and Documentation pages are painted with whatever the app is using at the moment they are generated.</p>
 
     <h3>The Profile collapse</h3>
-    <p>The <span class="ui-label">Research profile</span> lives in a panel opened from the person icon in the left rail, rather than in the sidebar: it is set once and then left alone for months, and in the sidebar it pushed the journal list and the fetch settings below the fold every session. Opening it narrows the feed rather than covering it, and Escape closes it. The panel state is not saved.</p>
+    <p>The <span class="ui-label">${railIcon('profile-btn')}Research profile</span> panel is opened from the left rail rather than living in the sidebar: it is set once and then left alone for months, and in the sidebar it pushed the journal list and the fetch settings below the fold every session. Opening it narrows the feed rather than covering it, and Escape closes it. The panel state is not saved.</p>
   </div>
 
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes with Claude (Anthropic) &middot; 2026</footer>
+  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
