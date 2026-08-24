@@ -1442,7 +1442,7 @@
 
           <div class="setting-block">
             <div class="slider-row">
-              <span class="slider-label" data-tip="How far back to look. Auto uses the gap since the last successful run, so nothing is missed between runs; a run where a source failed does not count as successful.">Fetch days back</span>
+              <span class="slider-label" data-tip="How far back to look. Auto asks each source for everything since that source was last fetched in full, so a source that has been failing is caught up on its own rather than being cut short by the others.">Fetch days back</span>
               <!-- Deliberately not type="number": that draws spinner arrows,
                    which some browsers show only on hover, so the row's width
                    would depend on where the pointer was. maxlength is 2, so the
@@ -1450,7 +1450,7 @@
                    is one width whatever is in it. -->
               <input type="text" inputmode="numeric" maxlength="4" class="slider-num" id="days-back-num" value="2"
                      aria-label="Fetch days back, in days"
-                     data-tip="Any value from 1 to 99 days, or Auto to use the gap since the last successful run.">
+                     data-tip="Any value from 1 to 99 days, or Auto to ask each source for everything since it was last fetched in full.">
             </div>
             <input type="range" class="slider" id="days-back-range" min="0" max="30" step="1" value="2" aria-label="Fetch days back, zero for automatic">
             <!-- The single source of truth, and what gets stored: "auto", or a
@@ -1680,7 +1680,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.6';
+const VERSION = 'v3.7';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -2973,6 +2973,83 @@ function arxivWindowStart(cat, cutoff, covered) {
   if (cutoff.getTime() < from) return cutoff;            // asking further back than we hold
   return new Date(Math.max(to, cutoff.getTime()));
 }
+// ── PER-SOURCE COVERAGE ──────────────────────────────────────────────────────
+// A single global "last successful run" clock could not describe what actually
+// happens: one flaky relay makes the whole run unclean, so the clock never
+// advances, "Auto" falls back to its constant, and every other source is asked
+// for two days however long the gap really was. Success is per source, so
+// coverage is too.
+//
+// The value is the instant a source was last fetched in full — no error, no
+// partial, nothing trimmed by the run's cap. Under Auto a source is asked for
+// everything since its own value, however far back that is, which is the
+// promise the mode is documented to make.
+const SOURCE_COVERED_KEY = 'litmonitor_source_covered';
+
+// arXiv is asked by submission date, and its submittedDate index runs two to
+// three days behind, so a window starting exactly where the last one ended
+// never sees what was indexed behind it. Re-asking costs one relay call and no
+// tokens — a paper already scored is a cache hit — so the overlap is generous.
+// OpenAlex does not need this: it is asked what it has ADDED since the last
+// fetch, which is the exact question and needs no guessed constant.
+const COVERAGE_OVERLAP_DAYS = 4;
+
+// A source with a coverage record is asked for works OpenAlex CREATED since
+// that moment, which cannot miss a paper indexed late. The floor exists only so
+// that an archival backfill — a journal's whole 2019 volume appearing at once —
+// cannot hand a run a thousand papers to score. It hangs off the coverage mark
+// rather than off today, so a source that has been failing for months still
+// gets everything published during its own gap.
+const OPENALEX_BACKFILL_FLOOR_DAYS = 90;
+
+// Keyed by what the source *is*, not by its position in the list: custom
+// journals are numbered `custom-0`, `custom-1`, so reordering that box would
+// otherwise hand one journal's coverage to another.
+function coverageKey(j) {
+  return j.type === 'openalex'
+    ? `oa:${j.openalexIssn || j.openalexSourceId}`
+    : `ax:${j.rss}`;
+}
+
+function loadSourceCovered() {
+  try {
+    const raw = localStorage.getItem(SOURCE_COVERED_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch(e) { return {}; }
+}
+
+function markSourceCovered(keys, whenIso) {
+  if (!keys.length) return;
+  const covered = loadSourceCovered();
+  keys.forEach(k => { covered[k] = whenIso; });
+  lsSet(SOURCE_COVERED_KEY, JSON.stringify(covered), true);
+}
+
+// The window one source is owed. Auto reaches back to that source's last
+// complete fetch so nothing between then and now can be missed; a typed number
+// stays literal, because a number the PI typed should mean what it says.
+function sourceCutoff(key, cutoff, covered, isAuto) {
+  if (!isAuto) return cutoff;
+  const last = Date.parse(covered[key]);
+  if (!isFinite(last)) return cutoff;             // never fetched: use the control
+  const owed = new Date(last - COVERAGE_OVERLAP_DAYS * 86400000);
+  return owed < cutoff ? owed : cutoff;           // may widen, never narrows
+}
+
+// How far behind the furthest-behind source is, for the status line and the
+// catching-up notice. A source with no record at all is not "behind" — it has
+// no history to be behind of — so it does not stretch the reported window.
+function coverageGapDays(keys, covered, nowMs) {
+  let oldest = null;
+  keys.forEach(k => {
+    const t = Date.parse(covered[k]);
+    if (isFinite(t) && (oldest === null || t < oldest)) oldest = t;
+  });
+  if (oldest === null) return null;
+  return Math.max(1, Math.ceil((nowMs - oldest) / 86400000));
+}
+
 let arxivNextSlot = 0;
 
 async function arxivSlot() {
@@ -3119,45 +3196,75 @@ async function openAlexFetch(url) {
 // ── FETCH FROM OPENALEX (no proxy needed, fully open API) ────────────────────
 // identifier: ISSN string (e.g. "1748-9326") OR OpenAlex source ID (e.g. "S4306401273")
 // To find a source ID: https://api.openalex.org/sources?filter=display_name.search:JOURNAL+NAME
-async function fetchOpenAlex(identifier, journalName, cutoff, isPreprint) {
+// One page held 50 works and there was no second page. The sort is by
+// publication date descending, so a journal with more than 50 works in the
+// window lost its OLDEST days silently — precisely the days a widened window
+// exists to recover, and with nothing to say it had happened. Paged, with the
+// API's own count read back, so a window too big to carry is reported rather
+// than trimmed in the dark.
+const OPENALEX_PER_PAGE = 200;   // the API's own maximum
+const OPENALEX_PAGES = 5;        // 1000 works from one journal in one window
+
+// Returns { papers, total, capped }. `total` is OpenAlex's own count for the
+// window, which is how a run knows it asked for more than it could carry.
+//
+// `sinceCreated`, when given, switches the question from "published since" to
+// "added to OpenAlex since". OpenAlex ingests a record days to weeks after the
+// paper's publication date, so a publication-date window that starts where the
+// last one ended silently steps over everything indexed behind it. Asking by
+// creation date is what makes "nothing is missed" true rather than approximate;
+// `cutoff` is then only the backfill floor.
+async function fetchOpenAlex(identifier, journalName, cutoff, isPreprint, sinceCreated) {
   const fromDate = cutoff.toISOString().split('T')[0];
+  const createdFilter = sinceCreated
+    ? `,from_created_date:${new Date(sinceCreated).toISOString().split('T')[0]}`
+    : '';
   // Detect whether identifier is an OpenAlex source ID (starts with S + digits) or an ISSN
   const filterKey = /^S\d+$/.test(identifier)
     ? `primary_location.source.id:https://openalex.org/${identifier}`
     : `primary_location.source.issn:${identifier}`;
-  const url = `https://api.openalex.org/works?filter=${filterKey},from_publication_date:${fromDate}&per-page=50&sort=publication_date:desc&select=id,title,authorships,abstract_inverted_index,primary_location,publication_date,doi&mailto=litmonitor@user`;
-  const resp = await openAlexFetch(url);
-  if (!resp.ok) throw new Error(`OpenAlex API error ${resp.status}`);
-  const data = await resp.json();
   const results = [];
-  (data.results || []).forEach(work => {
-    const title = work.title || '';
-    if (!title) return;
-    const date = new Date(work.publication_date || '');
-    if (cutoff && !isNaN(date) && date < cutoff) return;
-    const allNames = (work.authorships || [])
-      .map(a => a.author?.display_name || '')
-      .filter(Boolean);
-    // Displayed list stays at five; the full list rides along only so the
-    // deterministic priority-author match can see authors past the fifth, which
-    // is where a PI is most often listed on a large collaboration paper. Capped
-    // so a thousand-author consortium paper cannot bloat the run.
-    const authors    = allNames.slice(0, 5).join(', ');
-    const allAuthors = allNames.slice(0, 50).join(', ');
-    let abstract = '';
-    if (work.abstract_inverted_index) {
-      const words = {};
-      Object.entries(work.abstract_inverted_index).forEach(([word, positions]) => {
-        positions.forEach(pos => { words[pos] = word; });
-      });
-      abstract = Object.keys(words).sort((a,b) => Number(a)-Number(b)).map(k => words[k]).join(' ');
-    }
-    const doi = work.doi || '';
-    const link = doi ? `https://doi.org/${doi.replace('https://doi.org/','')}` : (work.primary_location?.landing_page_url || '');
-    const id = doi || `${title}-${work.publication_date}`;
-    results.push({ id, title, authors, allAuthors, abstract, link, date, journal: journalName, preprint: !!isPreprint });
-  });
-  return results;
+  let total = 0, seen = 0;
+  for (let page = 1; page <= OPENALEX_PAGES; page++) {
+    const url = `https://api.openalex.org/works?filter=${filterKey},from_publication_date:${fromDate}${createdFilter}&per-page=${OPENALEX_PER_PAGE}&page=${page}&sort=publication_date:desc&select=id,title,authorships,abstract_inverted_index,primary_location,publication_date,doi&mailto=litmonitor@user`;
+    const resp = await openAlexFetch(url);
+    if (!resp.ok) throw new Error(`OpenAlex API error ${resp.status}`);
+    const data = await resp.json();
+    total = Number(data.meta && data.meta.count) || total;
+    const batch = data.results || [];
+    seen += batch.length;
+    batch.forEach(work => {
+      const title = work.title || '';
+      if (!title) return;
+      const date = new Date(work.publication_date || '');
+      if (cutoff && !isNaN(date) && date < cutoff) return;
+      const allNames = (work.authorships || [])
+        .map(a => a.author?.display_name || '')
+        .filter(Boolean);
+      // Displayed list stays at five; the full list rides along only so the
+      // deterministic priority-author match can see authors past the fifth, which
+      // is where a PI is most often listed on a large collaboration paper. Capped
+      // so a thousand-author consortium paper cannot bloat the run.
+      const authors    = allNames.slice(0, 5).join(', ');
+      const allAuthors = allNames.slice(0, 50).join(', ');
+      let abstract = '';
+      if (work.abstract_inverted_index) {
+        const words = {};
+        Object.entries(work.abstract_inverted_index).forEach(([word, positions]) => {
+          positions.forEach(pos => { words[pos] = word; });
+        });
+        abstract = Object.keys(words).sort((a,b) => Number(a)-Number(b)).map(k => words[k]).join(' ');
+      }
+      const doi = work.doi || '';
+      const link = doi ? `https://doi.org/${doi.replace('https://doi.org/','')}` : (work.primary_location?.landing_page_url || '');
+      const id = doi || `${title}-${work.publication_date}`;
+      results.push({ id, title, authors, allAuthors, abstract, link, date, journal: journalName, preprint: !!isPreprint });
+    });
+    // A short page is the last page; asking for another wastes a request and
+    // risks a 429 for every journal on the list.
+    if (batch.length < OPENALEX_PER_PAGE) break;
+  }
+  return { papers: results, total, capped: total > seen };
 }
 
 // ── PARSE RSS ─────────────────────────────────────────────────────────────────
@@ -4464,12 +4571,30 @@ async function runFetchAndScore() {
   fetchBtn.disabled = true;
   stopBtn.style.display = '';
   resetRunUsage();
-  setStatus((daysSetting === 'auto')
-    ? `fetching ${daysBack} day${daysBack === 1 ? '' : 's'} back (auto)...`
-    : 'fetching...');
-
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
+
+  // Auto is the mode that promises nothing is missed, so its real window is
+  // whatever the furthest-behind source is owed rather than the gap since the
+  // last clean run. One source failing for a fortnight no longer shortens the
+  // window for the rest, and no longer lets its own days fall off the back.
+  const isAuto = daysSetting === 'auto';
+  const covered = loadSourceCovered();
+  const coverKeys = selectedJournals.map(coverageKey);
+  const gapDays = isAuto ? coverageGapDays(coverKeys, covered, Date.now()) : null;
+  const owedDays = gapDays === null ? null : gapDays + COVERAGE_OVERLAP_DAYS;
+  const effectiveDays = owedDays === null ? daysBack : Math.max(daysBack, owedDays);
+  // Sources that answered in full this run; only these advance their coverage.
+  const coveredOk = new Set();
+
+  setStatus(isAuto
+    ? `fetching ${effectiveDays} day${effectiveDays === 1 ? '' : 's'} back (auto)...`
+    : 'fetching...');
+  // A window much wider than the control's own value is the catching-up case,
+  // and saying so explains both the wait and the paper count.
+  if (isAuto && owedDays !== null && owedDays > daysBack) {
+    showNotice(`Catching up: the furthest-behind source was last fetched in full ${gapDays} day${gapDays === 1 ? '' : 's'} ago, so it is asked for that whole span instead of ${daysBack}.`);
+  }
 
   // Step 1: Fetch all journals
   let allPapers = [];
@@ -4495,20 +4620,42 @@ async function runFetchAndScore() {
 
   async function fetchOne(i) {
     const j = selectedJournals[i];
+    // Coverage is per source, so the window is too: a source that is behind is
+    // asked for everything it is owed while its neighbours are asked only for
+    // the control's window.
+    const key = coverageKey(j);
+    const since = sourceCutoff(key, cutoff, covered, isAuto);
     try {
       let parsed = [];
       if (j.type === 'openalex') {
-        parsed = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, cutoff, j.preprint);
+        // Auto with a coverage record asks what OpenAlex has added since that
+        // moment; a first fetch, or a typed number, keeps the plain window.
+        const mark = isAuto ? Date.parse(covered[key]) : NaN;
+        const sinceCreated = isFinite(mark) ? new Date(mark).toISOString() : null;
+        const floor = isFinite(mark)
+          ? new Date(mark - OPENALEX_BACKFILL_FLOOR_DAYS * 86400000)
+          : cutoff;
+        const oa = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, floor, j.preprint, sinceCreated);
+        parsed = oa.papers;
+        // Same rule as arXiv: a window bigger than a run can carry is a partial,
+        // not a success, so its oldest days stay askable next time.
+        if (oa.capped) {
+          partialNotes.push({ source: j.name,
+            reason: `more papers in that window than a run fetches (${oa.total} against ${OPENALEX_PAGES * OPENALEX_PER_PAGE})` });
+        }
       } else {
         // The category is read off the feed URL rather than duplicated in
         // JOURNALS, so the two can never disagree.
         const cat = (j.rss.match(/\/rss\/(.+)$/) || [])[1];
-        parsed = await fetchArxivBoth(j, cat, cutoff, fetchErrors, partialNotes);
+        parsed = await fetchArxivBoth(j, cat, since, fetchErrors, partialNotes);
       }
       // The filter is applied per source, so each paper has to remember which
       // kind of feed it came from.
       parsed.forEach(p => { p.highVolume = !!j.highVolume; });
       results[i] = parsed;
+      // Answering in full means no throw and no partial of its own. Tested by
+      // source rather than by counting notes, because four sources fetch at once.
+      if (!partialNotes.some(n => n.source === j.name)) coveredOk.add(key);
     } catch(e) {
       fetchErrors.push(`${j.name}: ${e.message}`);
       results[i] = [];
@@ -4540,7 +4687,7 @@ async function runFetchAndScore() {
   // covers are re-requested by the next successful run. Saying so is the
   // difference between a warning and an alarm.
   if (fetchErrors.length) {
-    showError(`Some feeds failed: ${fetchErrors.join(' | ')}. Papers from the other sources are still scored, and because the failed window is not marked as covered, the next successful run asks for those days again.`);
+    showError(`A source was unreachable — nothing you did, and nothing for you to do. arXiv is read through free public relays and OpenAlex rate-limits, so both drop out from time to time. Papers from the other sources are still scored, and the days this source owes stay marked as not covered, so the next run that reaches it asks for them again.\nUnreachable: ${fetchErrors.join(' | ')}`);
   }
   // A partial is not a failure: the source answered, but not for the whole
   // window, so it is reported separately and never subtracted from the count of
@@ -4555,7 +4702,7 @@ async function runFetchAndScore() {
       if (!byReason.get(n.reason).includes(n.source)) byReason.get(n.reason).push(n.source);
     });
     const lines = [...byReason].map(([reason, sources]) => `${sources.slice().sort().join(', ')} — ${reason}`);
-    showNotice(`Fetched, but not in full. Those days are asked for again next run.\n${lines.join('\n')}`);
+    showNotice(`Fetched, but not in full — nothing you did, and nothing for you to do. A source answered for part of its window only, which is normal for a free relay. Those days stay marked as not covered, so the next run that works asks for them again.\n${lines.join('\n')}`);
   }
 
   if (allPapers.length === 0) {
@@ -4608,13 +4755,26 @@ async function runFetchAndScore() {
 
   // Hard cap: never score more than 1000 papers in a single run
   const MAX_PAPERS_TOTAL = 1000;
+  let cappedDropped = {};
   if (allPapers.length > MAX_PAPERS_TOTAL) {
     const capped = capPapersFairly(allPapers, MAX_PAPERS_TOTAL);
+    cappedDropped = capped.droppedBySource;
     const worst = Object.entries(capped.droppedBySource)
       .sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([k, n]) => `${k} −${n}`).join(', ');
     showNotice(`Fetched ${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). Reduce "Fetch days back" or add terms to the arXiv.cs filter to stay under the limit.`);
     allPapers = capped.kept;
+  }
+
+  // Coverage is written here, after the cap, because a source whose papers were
+  // trimmed did not deliver its window either — marking it covered would discard
+  // exactly the papers the cap set aside. A stopped run marks nothing.
+  if (!abortRequested) {
+    const trimmed = new Set(Object.keys(cappedDropped));
+    const nowIso = new Date().toISOString();
+    markSourceCovered(selectedJournals
+      .filter(j => coveredOk.has(coverageKey(j)) && !trimmed.has(j.name))
+      .map(coverageKey), nowIso);
   }
 
   // Step 1.5: Split by score cache — skip re-scoring papers already seen by Sonnet
@@ -5661,6 +5821,7 @@ document.getElementById('clear-cache-btn').addEventListener('click', () => {
     // Coverage says which arXiv days have already been asked for. Clearing the
     // caches means asking for everything again, so it has to go too.
     localStorage.removeItem(ARXIV_COVERED_KEY);
+    localStorage.removeItem(SOURCE_COVERED_KEY);
     quotaWarned = false;
     storageFull = false;
     renderPapers();
@@ -5793,7 +5954,10 @@ ${pageIcon()}
       <div class="field-name">Fetch days back</div>
       <div class="field-body">
         <p>How far back to look. The slider covers <strong>1&ndash;30 days</strong>, with <strong>Auto</strong> at its left-hand stop; type into the box for any window up to 99 days, or type <em>Auto</em>.</p>
-        <p><strong>Auto</strong> uses the gap since the last successful run, rounded up, capped at 30 days, and reported in the status line. A run where a source failed does not count as successful, so its days are asked for again.</p>
+        <p><strong>Auto</strong> asks each source for everything since <em>that source</em> was last fetched in full, rounded up and reported in the status line. Coverage is recorded per source, so a relay that has been failing for a fortnight is asked for the whole fortnight on the next run that works, while the sources that were fine are asked only for the recent window. A source is recorded as covered only when it answered without error, without a partial, and without having its papers trimmed by the 1,000-paper cap. When the window has to stretch well past the control's own value, the run says so in a <em>Catching up</em> notice.</p>
+        <p>A source with no record at all &mdash; a journal you just added, or a first run &mdash; has no history to catch up on, so it gets the ordinary window instead.</p>
+        <p>Catching up asks a different question of each kind of source. A journal is asked what OpenAlex has <em>added</em> since it was last fetched in full, rather than what was published since then: OpenAlex ingests a record days to weeks after the publication date, so a publication-date window would step straight over anything indexed behind it. Only an archival backfill is excluded, by ignoring papers published more than 90 days before the coverage mark. arXiv is asked by submission date with a four-day overlap instead, because its own submission index runs two to three days behind.</p>
+        <p>Re-asking costs no tokens. Papers are matched against the score cache before any Claude call, so a paper already scored under the current profile is a cache hit and is never sent again; only papers genuinely new to you are scored. Editing the Research profile is the one thing that invalidates that cache.</p>
         <p>The window applies to arXiv too. arXiv is asked for papers submitted inside it, rather than for its RSS feed, which carries only the current announcement batch &mdash; so a day missed because a run failed or did not happen is picked up by the next successful run.</p>
       </div>
     </div>

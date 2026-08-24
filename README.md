@@ -51,7 +51,7 @@ Editing any field re-scores every paper on the next run — the cache is keyed t
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| **Fetch days back** | 2 | A slider over 1–30 days with **Auto** at its left stop, or type any window up to 99 into the box. **Auto** uses the gap since your last successful run. The window applies to arXiv as well as to journals, so days missed by a failed run come back on the next one. |
+| **Fetch days back** | 2 | A slider over 1–30 days with **Auto** at its left stop, or type any window up to 99 into the box. **Auto** asks each source for everything since *that source* was last fetched in full, so a feed that has been failing for a fortnight is caught up on the next run that works while the sources that were fine keep the recent window. Coverage is recorded per source and only when the source answered without error, without a partial, and without being trimmed by the 1,000-paper cap. Journals are asked what OpenAlex has *added* since that mark rather than what was published, because OpenAlex indexes a paper days to weeks after its publication date; arXiv is asked by submission date with a four-day overlap. Catching up costs no extra tokens — papers already scored under the current profile are cache hits. A typed number stays a literal window. |
 | **Haiku prefilter** | On | A cheap Haiku pass drops the clear misses before Sonnet scores anything. The main cost saving. |
 | **Drop if Haiku scores ≤** | 5 | Higher saves more and risks losing borderline papers. |
 | **Abstract chars** | All | How much of each abstract is sent for scoring: 500, 1000, 1500, 2000, 2500 or **All**. Lower it if a run costs more than you expect. |
