@@ -145,11 +145,23 @@
   .rail-btn:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
   .rail-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .rail-btn:disabled { cursor: not-allowed; }
-  /* Every other rail button is inert while it works. This one is the Stop
-     control as well as the progress indicator, so it stays clickable and
-     says so with the cursor. */
+  /* Every other rail button is inert while it works and spins to say so. This
+     one does neither. It stays clickable, because while a run is going it is
+     the Stop control. And it does not spin: the progress row in the feed column
+     already has a spinner, a bar and a percentage, and that row is in <main>,
+     so it survives the sidebar closing. A second spinner beside it read as a
+     second thing happening, and in red it read as a failure — red is what this
+     app uses for something broken. A square says the one thing this button
+     needs to say, in the same red as the sidebar's own Stop, which is a control
+     rather than a message and has always been red. */
   #run-btn.busy { cursor: pointer; color: var(--red); }
-  #run-btn.busy::before { border-top-color: var(--red); }
+  #run-btn.busy::before {
+    width: 12px; height: 12px;
+    border: none;
+    border-radius: 2px;
+    background: var(--red);
+    animation: none;
+  }
   /* Busy swaps the icon for a spinner without touching the button's children. */
   .rail-btn.busy { color: var(--accent); cursor: progress; }
   .rail-btn.busy > svg { visibility: hidden; }
@@ -647,14 +659,35 @@
   .adv-hint { margin: 0 0 20px; }
   .advanced-body { display: flex; flex-direction: column; gap: 20px; }
 
-  /* Stop is transient and narrow; it stays a chip. */
-  .toggle-chip {
-    border-radius: var(--pill);
-    font-size: 11.5px;
-    padding: 4px 12px;
+  /* Stop was a pill. Everything else wearing that shape here is a state or a
+     label — the All/New/Starred filters, the score badge, the priority-author
+     tag — and none of them does anything when pressed except change what is
+     shown. Stop is a one-shot action, and for the minute it exists it is the
+     most urgent control on screen, since what it stops is money being spent.
+     It takes the button shape and Fetch's own footprint now, so it reads as
+     Fetch's counterpart standing in the same place, outlined in red rather than
+     filled: nothing in this app is filled red, and a solid red slab under a
+     greyed-out Fetch would shout. */
+  .btn-stop {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 11px 16px;
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .btn-stop:hover {
+    background: color-mix(in srgb, var(--red) 10%, transparent);
+    border-color: var(--red);
+    color: var(--red);
   }
   .head-actions { flex-wrap: wrap; }
   .head-actions .btn { flex: 0 0 auto; }
+  .head-actions .btn-stop { flex: 1 1 100%; }
 
   .section-actions { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 6px; }
 
@@ -1082,7 +1115,7 @@
   /* The whole card opens the paper, so it says so. Only a card that has a link
      gets the cursor — a paper with no resolvable URL is not clickable. */
   .paper-card.linked { cursor: pointer; }
-  .paper-card.linked .card-abstract,
+  .paper-card.linked .card-abstract:not(.no-abstract),
   .paper-card.linked .card-actions { cursor: auto; }
   .paper-authors {
     font-size: 12.5px;
@@ -1503,7 +1536,7 @@
       <div class="logo">LitMonitor <span>Earth</span></div>
       <button class="btn btn-primary" id="fetch-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.52 14.74A8 8 0 1 1 18.55 7.41L21.5 9"/><polyline points="21.5 3.8 21.5 9 16.5 9"/></svg>Fetch &amp; Score</button>
       <div class="head-actions">
-        <button class="btn btn-ghost toggle-chip" id="stop-btn" style="display:none;border-color:var(--red);color:var(--red)" data-tip="Stop after the batch already in flight. Papers scored so far are kept.">&#9632; Stop</button>
+        <button class="btn btn-ghost btn-stop" id="stop-btn" style="display:none" data-tip="Stop after the batch already in flight. Papers scored so far are kept.">&#9632; Stop</button>
       </div>
       <span id="status-line" aria-live="polite">ready</span>
     </div>
@@ -1763,7 +1796,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.12';
+const VERSION = 'v3.13';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -4546,17 +4579,22 @@ function renderPapers() {
     if (!clipped && !skipped) btn.style.display = 'none';
   });
 
-  // Clicking the card itself expands it too, which is the ordinary behaviour
-  // for a disclosure. Two things are deliberately not treated as a click on the
-  // card: anything that lands on a control or the title link, which has its own
-  // job, and a click that ends a text selection, since the abstract is text
-  // people copy out.
-  container.querySelectorAll('.paper-card').forEach(card => {
-    card.addEventListener('click', e => {
-      if (e.target.closest('button, a, input, select, textarea, label')) return;
+  // Expanding is confined to the abstract itself. It used to be bound to the
+  // whole card, which was fine while that was all a card click did; since the
+  // card started opening the paper, one click on the score badge or the date
+  // both opened the paper and expanded the abstract behind it. The two regions
+  // are disjoint now: this handler owns the shaded abstract block, and the
+  // handler that opens the paper explicitly skips it.
+  //
+  // A click that ends a text selection is not a click, since the abstract is
+  // text people copy out, and the "no abstract" block is not a disclosure — it
+  // has nothing behind it, so it is left to open the paper like the rest.
+  container.querySelectorAll('.card-abstract:not(.no-abstract)').forEach(block => {
+    block.addEventListener('click', e => {
+      if (e.target.closest('button, a')) return;   // the Show more button has its own
       const sel = window.getSelection();
-      if (sel && !sel.isCollapsed && card.contains(sel.anchorNode)) return;
-      toggleAbstract(card);
+      if (sel && !sel.isCollapsed && block.contains(sel.anchorNode)) return;
+      toggleAbstract(block.closest('.paper-card'));
     });
   });
 
@@ -4985,7 +5023,15 @@ async function runFetchAndScore() {
     fetchBtn.disabled = false;
     stopBtn.style.display = 'none';
     syncRunBtn();
-    setStatus('ready');
+    // "ready" was what a run that found nothing left behind, which reads as
+    // though the app had been reset rather than as though it had just finished.
+    // Every other finished run says "last run: …", and a run that came back
+    // empty is a finished run — it says when, and whether that emptiness is
+    // explained by a source that did not answer.
+    const emptyFailed = fetchErrors.length
+      ? ` · ${fetchErrors.length} source${fetchErrors.length === 1 ? '' : 's'} failed`
+      : '';
+    setStatus(`last run: ${shortWhen(new Date())} · no papers found${emptyFailed}`);
     return;
   }
 
@@ -6650,7 +6696,7 @@ ${pageIcon()}
     <p>Under the abstract, one sentence explains why Claude assigned the score it did. This is what you use to calibrate your profile over time.</p>
 
     <h3>Card actions</h3>
-    <p>Clicking anywhere on a card opens the paper &mdash; the score, the journal, the date, the title, the authors, the score reasoning, and the space between them. The abstract and the row of buttons are the two exceptions, because a click there already means something else, and a card whose paper has no resolvable link is not clickable at all.</p>
+    <p>Clicking anywhere on a card opens the paper &mdash; the score, the journal, the date, the title, the authors, the score reasoning, and the space between them. The two exceptions are the row of buttons and the shaded abstract, where a click expands or collapses the abstract instead; a card whose paper has no resolvable link is not clickable at all. A card that says <em>No abstract available</em> has nothing to expand, so that block opens the paper like the rest of the card.</p>
     <p><span class="ui-label">Copy citation</span> puts a formatted citation on the clipboard. A preprint is labelled as one and always carries its URL.</p>
     <p><span class="ui-label">&#9734; Star</span> keeps the paper in the <span class="ui-label">&#9733; Starred</span> view across runs, whether or not a later run fetches it again. Click again to remove it. Starred papers survive <span class="ui-label">Clear cache</span>.</p>
     <p><span class="ui-label">+ More like this</span> records the paper as a <span class="ui-label">Learned example</span>. The examples are listed in the <span class="ui-label">Research profile</span> panel and pasted verbatim into the scoring prompt as calibration for what an 8&ndash;10 looks like, so the next run scores against them. Adding one invalidates the score cache, so that run re-scores rather than mixing old and new judgements.</p>
@@ -6736,7 +6782,7 @@ function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;v
 // Delegated from the container and registered once, because renderPapers()
 // replaces every card on every render.
 document.getElementById('papers-container').addEventListener('click', e => {
-  if (e.target.closest('button, a, .card-abstract')) return;
+  if (e.target.closest('button, a, .card-abstract:not(.no-abstract)')) return;
   const card = e.target.closest('.paper-card');
   if (!card) return;
   // Finishing a drag over the authors line is a selection, not a click.

@@ -25,7 +25,7 @@ Expect roughly **$0.10–0.12 per 100 papers**.
 
 ## The interface
 
-**Left rail**, top to bottom: **Fetch & Score**, **Brief** and **Export**; at the foot, **Research profile**, the theme control, **Documentation** and **Back up & restore**. The rail's **Fetch & Score** spins and turns red while a run is going, and a click on it stops the run — so starting, stopping and watching a run all survive the sidebar being closed. Hover any of them for its name. The sidebar hides from a button on its own edge, not from the rail.
+**Left rail**, top to bottom: **Fetch & Score**, **Brief** and **Export**; at the foot, **Research profile**, the theme control, **Documentation** and **Back up & restore**. The rail's **Fetch & Score** becomes a red stop square while a run is going, and a click on it stops the run — so starting and stopping a run survive the sidebar being closed. Progress itself is in the feed column, not the sidebar, so the spinner, bar and percentage stay on screen either way. Hover any of them for its name. The sidebar hides from a button on its own edge, not from the rail.
 
 **Sidebar**: everything that changes the next run — fetch settings, journals, custom sources, API key — with **Cost estimate** and **Clear cache** at the bottom. Its top section does not scroll, so **Fetch & Score** and the status line stay in reach.
 
@@ -107,7 +107,7 @@ The **abstract** sits under the authors, four lines deep. It starts at the paper
 | **+ More like this** | Records it as a *learned example*. |
 | **Dismiss** | Hides it and keeps it out of future runs. |
 
-Clicking anywhere on a card opens the paper — the score, the journal, the date, the title, the authors, the score reasoning, and the space between them. The abstract and the row of buttons are the two exceptions, because a click there already means something else.
+Clicking anywhere on a card opens the paper — the score, the journal, the date, the title, the authors, the score reasoning, and the space between them. The two exceptions are the row of buttons and the shaded abstract, where a click expands or collapses the abstract instead. A card that says *No abstract available* has nothing to expand, so that block opens the paper like the rest.
 
 **Learned examples** go to Claude as calibration for what an 8–10 looks like in your field, which is often quicker than describing it in *Prioritize*. The list is at the foot of the profile panel: the newest 20 are sent by default (slider, 0–30), up to 100 are stored, and what the list shows is exactly what is sent. Adding or removing one re-scores on the next run.
 
