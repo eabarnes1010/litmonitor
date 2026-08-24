@@ -127,7 +127,9 @@ The starred view ignores the score floor and the dismissed list; the floor is gr
 
 The **Cost estimate** line at the foot of the sidebar shows this run, this calendar month, and how many papers that covers. Token counts are measured — every response reports them — and multiplied by published list rates, so the estimate is in the price, not the usage.
 
-To spend less, in order of effect: put terms in the arXiv.cs filter, leave the Haiku prefilter on, and re-run over overlapping windows — cached papers are free.
+If more than 300 papers could still reach Sonnet, a dialog asks before spending anything, with the estimated cost and run time. The number it quotes is what Sonnet may actually be asked to score, which is neither the number fetched nor the number missing from the score cache. There are two caches: Sonnet's, and the Haiku prefilter's own. A paper the prefilter rejected on an earlier run is not in the score cache — Sonnet never scored it — but it is in the prefilter's, so it is rejected again for no API call at all, and the dialog counts those separately instead of charging you for them. Its figure is a ceiling, since papers meeting the prefilter for the first time will mostly not get past it.
+
+To spend less, in order of effect: put terms in the arXiv.cs filter, leave the Haiku prefilter on, and re-run over overlapping windows — a paper already scored, or already rejected by the prefilter, costs nothing the second time.
 
 ---
 

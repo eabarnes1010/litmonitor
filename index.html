@@ -1061,21 +1061,22 @@
     color: var(--text);
     margin-bottom: 5px;
   }
-  /* Nothing at rest, underlined on hover — what a card headline does everywhere
-     from a news front page to a repository listing. The arrow that used to sit
-     here marked an exception that does not exist, since every title opens a
-     paper in a new tab, and a permanent underline read as clutter on a page of
-     stacked cards. Size, weight and position are what say "this is the paper";
-     the whole card is clickable anyway, so a touch user is not stranded. */
+  /* Not a link to look at. The title used to light up and underline under the
+     pointer, which was the affordance back when it was the only way into the
+     paper; now that the whole card opens it, highlighting one line says the
+     title is special when it is not, and the eye is pulled to it on every card
+     the pointer crosses. Size, weight and position are what say "this is the
+     paper". The anchor itself stays — it is what a keyboard tabs to and what a
+     cmd-click opens — and shows itself on focus, the one case with no cursor to
+     go by. */
   .paper-title a {
     color: inherit;
     text-decoration: none;
-    border-bottom: 1px solid transparent;
-    transition: color 0.15s, border-color 0.15s;
   }
-  .paper-title a:hover {
-    color: var(--accent);
-    border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  .paper-title a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
 
   /* The whole card opens the paper, so it says so. Only a card that has a link
@@ -1762,7 +1763,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.11';
+const VERSION = 'v3.12';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -5064,11 +5065,43 @@ async function runFetchAndScore() {
     }
   });
 
+  // Step 1.6: resolve the prefilter's own cache before anything is priced.
+  // A paper Haiku has already dropped under this profile is dropped again for
+  // no API call at all, and it is never in scoreCache because Sonnet never
+  // scored it — so it used to be counted, and charged for, as though it were
+  // about to be. On a re-run of a feed the prefilter mostly rejects, that is
+  // the difference between "830 papers, ~$4.33" and a few dozen papers.
+  const haikuThreshold = parseInt(document.getElementById('haiku-threshold').value)
+                       || HAIKU_THRESHOLD_DEFAULT;
+  let haikuNeed = [];              // no cached Haiku score: one Haiku call each
+  let haikuSurvivors = [];         // already past the prefilter, or exempt from it
+  let haikuPriorityBypassed = 0;
+  let haikuDroppedFromCache = 0;   // free: judged before, and judged again for nothing
+  if (haikusPrefilter) {
+    uncachedPapers.forEach(p => {
+      // A priority-author paper is never risked on the prefilter.
+      if (p.priorityAuthor) { haikuSurvivors.push(p); haikuPriorityBypassed++; return; }
+      const hit = haikuCache[`${p.id}|${fp}`];
+      if (!hit) haikuNeed.push(p);
+      else if (hit.score > haikuThreshold) haikuSurvivors.push(p);
+      else haikuDroppedFromCache++;
+    });
+  } else {
+    haikuNeed = uncachedPapers;
+  }
+  // The most that can reach Sonnet. An upper bound, not a forecast: a paper in
+  // haikuNeed may still be dropped once Haiku has looked at it.
+  const sonnetBound = haikusPrefilter
+    ? haikuNeed.length + haikuSurvivors.length
+    : uncachedPapers.length;
+
   // Abstract enrichment: fill gaps left by publisher copyright restrictions
   // using Semantic Scholar, which has broader abstract agreements. Runs after
-  // the cache split, since a paper served from cache is never re-scored and its
-  // abstract is not used — enriching it was a request for nothing.
-  const needAbstract = uncachedPapers.filter(p => !p.abstract || !p.abstract.trim());
+  // both cache splits, since neither a paper served from the score cache nor one
+  // the prefilter has already rejected is read by any model — enriching either
+  // was a request for nothing.
+  const stillLive = haikusPrefilter ? [...haikuNeed, ...haikuSurvivors] : uncachedPapers;
+  const needAbstract = stillLive.filter(p => !p.abstract || !p.abstract.trim());
   if (needAbstract.length > 0) {
     showProgress(selectedJournals.length, selectedJournals.length,
       `Enriching ${needAbstract.length} missing abstracts via Semantic Scholar…`);
@@ -5077,19 +5110,31 @@ async function runFetchAndScore() {
 
   // Step 2: Warn if large uncached batch
   const PAPER_WARN_THRESHOLD = 300;
-  if (uncachedPapers.length > PAPER_WARN_THRESHOLD) {
-    const batchCount = Math.ceil(uncachedPapers.length / 20);
+  if (sonnetBound > PAPER_WARN_THRESHOLD) {
+    const batchCount = Math.ceil(sonnetBound / 20);
     const estimatedMins = Math.ceil(batchCount * 0.5);
     const spendSoFar    = loadSpend();
     const perPaper      = costPerPaper(spendSoFar);
-    const estimatedCost = (uncachedPapers.length * perPaper).toFixed(2);
+    // Priced on sonnetBound rather than on every uncached paper: the measured
+    // rate is dollars per paper Sonnet scored, with the prefilter's own cost
+    // already folded into it, so multiplying it by papers that will never reach
+    // Sonnet charges for the prefilter twice over.
+    const estimatedCost = (sonnetBound * perPaper).toFixed(2);
     const basis = (spendSoFar && spendSoFar.papers > 0)
       ? `measured $${(perPaper * 100).toFixed(2)} per 100 papers over ${spendSoFar.papers} papers this month`
       : `estimated ~$${(COST_PER_PAPER_FALLBACK * 100).toFixed(2)} per 100 papers, no measured runs yet`;
+    const alreadyScored = cachedResults.length
+      ? `${cachedResults.length} already scored` : '';
+    const freeDrops = haikuDroppedFromCache
+      ? `${haikuDroppedFromCache} dropped by the Haiku cache for nothing` : '';
+    const accounted = [alreadyScored, freeDrops].filter(Boolean).join(', ');
     const proceed = confirm(
-      `${uncachedPapers.length} papers to score (${cachedResults.length} served from cache).\n\n` +
+      `At most ${sonnetBound} papers go to Sonnet${accounted ? ` (${accounted})` : ''}.\n\n` +
       `Estimated cost: ~$${estimatedCost} (${basis}).\n` +
       `Estimated time: ~${estimatedMins}–${estimatedMins + 2} minutes.\n\n` +
+      (haikuNeed.length && haikusPrefilter
+        ? `An upper bound: ${haikuNeed.length} of them still face the Haiku prefilter, which usually rejects most of what it sees.\n\n`
+        : '') +
       `To reduce scope: uncheck high-volume feeds (${filteredFeedNames().join(', ')}) or reduce "Fetch days back".\n\n` +
       `Proceed anyway?`
     );
@@ -5110,22 +5155,14 @@ async function runFetchAndScore() {
 
   if (uncachedPapers.length > 0) {
     if (haikusPrefilter) {
-      const haikuThreshold = parseInt(document.getElementById('haiku-threshold').value) || HAIKU_THRESHOLD_DEFAULT;
-
-      // Papers Haiku has already judged under this profile need no second call.
-      // The cached Haiku score is compared against the current threshold rather
-      // than the one in force when it was written, so moving the threshold
-      // re-decides cached papers for free.
-      const needHaiku = [];
-      let survivors = [];
-      let priorityBypassed = 0;
-      uncachedPapers.forEach(p => {
-        // A priority-author paper is never risked on the prefilter.
-        if (p.priorityAuthor) { survivors.push(p); priorityBypassed++; return; }
-        const hit = haikuCache[`${p.id}|${fp}`];
-        if (!hit) needHaiku.push(p);
-        else if (hit.score > haikuThreshold) survivors.push(p);
-      });
+      // Both lists were worked out above, before the cost warning, because the
+      // warning cannot price the run without them. The cached Haiku score is
+      // compared against the current threshold rather than the one in force
+      // when it was written, so moving the threshold re-decides cached papers
+      // for free.
+      const needHaiku = haikuNeed;
+      let survivors = haikuSurvivors;
+      const priorityBypassed = haikuPriorityBypassed;
       const haikuFromCache = uncachedPapers.length - needHaiku.length - priorityBypassed;
 
       if (needHaiku.length) {
@@ -6580,7 +6617,7 @@ ${pageIcon()}
     <p><strong>2. Deduplicate</strong> — Papers appearing in multiple sources (e.g. a paper cross-listed on arXiv and indexed in OpenAlex) are deduplicated by DOI or a title+date fingerprint.</p>
     <p><strong>3. Abstract enrichment</strong> — Papers without an abstract are looked up against the Semantic Scholar batch API using their DOI. Semantic Scholar has broader publisher agreements than OpenAlex, so many abstracts that OpenAlex omits (e.g. from Nature Group or AAAS journals) can be recovered here. Abstracts filled in this step are used for both scoring and brief generation.</p>
     <p><strong>4. Score cache split</strong> — Papers already in the local score cache under your current profile are set aside and displayed immediately with their cached score and reason — no API call needed. Only uncached papers proceed to the next steps.</p>
-    <p><strong>5. Large-batch warning</strong> — If more than 300 uncached papers remain, a confirmation dialog shows the estimated run time and gives you the option to cancel and narrow your selection.</p>
+    <p><strong>5. Large-batch warning</strong> &mdash; If more than 300 papers could still reach Sonnet, a confirmation dialog shows the estimated cost and run time and gives you the option to cancel and narrow your selection. It counts what Sonnet may actually be asked to score, which is neither the number fetched nor the number missing from the score cache: a paper the Haiku prefilter rejected on an earlier run is not in the score cache &mdash; Sonnet never scored it &mdash; but it is in the prefilter's own cache, so it is rejected again for no API call, and the dialog says how many of those there are rather than charging you for them. The number it does quote is a ceiling, since papers still facing the prefilter for the first time will mostly be dropped by it.</p>
     <p><strong>6. Score</strong> — Uncached papers are sent to Claude in batches of 20. If the Haiku prefilter is active, a fast Haiku pass runs first and drops low-scoring papers; survivors are then scored by Sonnet. New Sonnet and Haiku scores are both saved to the local caches for future runs. Each paper is returned with its own number so scores can never be attached to the wrong paper, even if the model skips one. Whatever comes back is kept, and only the papers still missing a score are re-sent, so a partial or truncated reply is never paid for twice. Papers that are still unscored after the retry are shown with score 0 and are neither cached nor marked as seen, so the next run picks them back up rather than losing them.</p>
     <p><strong>7. Results</strong> — All papers (cached + newly scored) are merged and displayed sorted by score, highest first. The status bar shows when the last run completed and how many papers were scored. At any point during steps 1–6 you can click the red <span class="ui-label">&#9632; Stop</span> button in the sidebar head to halt the run early; papers scored up to that point are shown normally.</p>
     <div class="tip"><strong>New vs. seen:</strong> LitMonitor tracks every paper ID it has ever scored. Papers not seen in a previous run get a ring around their score badge, and that marking persists across browser sessions until you clear the cache.</div>
