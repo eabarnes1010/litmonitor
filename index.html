@@ -1736,7 +1736,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.9';
+const VERSION = 'v3.10';
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -4764,11 +4764,14 @@ async function runFetchAndScore() {
   setStatus(isAuto
     ? `fetching ${effectiveDays} day${effectiveDays === 1 ? '' : 's'} back (auto)...`
     : 'fetching...');
-  // A window much wider than the control's own value is the catching-up case,
-  // and saying so explains both the wait and the paper count.
-  if (isAuto && owedDays !== null && owedDays > daysBack) {
-    showNotice(`Catching up: the furthest-behind source was last fetched in full ${gapDays} day${gapDays === 1 ? '' : 's'} ago, so it is asked for that whole span instead of ${daysBack}.`);
-  }
+  // There was a "Catching up" notice here. It fired on almost every Auto run —
+  // owedDays is the gap plus a four-day overlap, so it clears the two-day
+  // default even when nothing is behind — and it reported the raw gap while the
+  // window it was explaining was the gap plus the overlap, so a normal daily run
+  // announced "last fetched 1 day ago, so it is asked for that whole span
+  // instead of 2" above a status line that said 5 days. A permanent notice that
+  // contradicts the status line reads as a fault. The status line already says
+  // how wide the window is, which is the only part that was worth saying.
 
   // Step 1: Fetch all journals
   let allPapers = [];
@@ -6346,9 +6349,9 @@ ${pageIcon()}
       <div class="field-name">Fetch days back</div>
       <div class="field-body">
         <p>How far back to look. The slider covers <strong>1&ndash;30 days</strong>, with <strong>Auto</strong> at its left-hand stop; type into the box for any window up to 99 days, or type <em>Auto</em>.</p>
-        <p><strong>Auto</strong> asks each source for everything since <em>that source</em> was last fetched in full, rounded up and reported in the status line. Coverage is recorded per source, so a relay that has been failing for a fortnight is asked for the whole fortnight on the next run that works, while the sources that were fine are asked only for the recent window. A source is recorded as covered only when it answered without error, without a partial, and without having its papers trimmed by the 1,000-paper cap. When the window has to stretch well past the control's own value, the run says so in a <em>Catching up</em> notice.</p>
+        <p><strong>Auto</strong> asks each source for everything since <em>that source</em> was last fetched in full, rounded up and reported in the status line. Coverage is recorded per source, so a relay that has been failing for a fortnight is asked for the whole fortnight on the next run that works, while the sources that were fine are asked only for the recent window. A source is recorded as covered only when it answered without error, without a partial, and without having its papers trimmed by the 1,000-paper cap. The window Auto settles on is the one named in the status line while the run is going, and it carries a four-day overlap so a source that reports late is not stepped over.</p>
         <p>A source with no record at all &mdash; a journal you just added, or a first run &mdash; has no history to catch up on, so it gets the ordinary window instead.</p>
-        <p>Catching up asks a different question of each kind of source. A journal is asked what OpenAlex has <em>added</em> since it was last fetched in full, rather than what was published since then: OpenAlex ingests a record days to weeks after the publication date, so a publication-date window would step straight over anything indexed behind it. Only an archival backfill is excluded, by ignoring papers published more than 90 days before the coverage mark. arXiv is asked by submission date with a four-day overlap instead, because its own submission index runs two to three days behind.</p>
+        <p>Catching up asks a different question of each kind of source, whether or not the window is wide. A journal is asked what OpenAlex has <em>added</em> since it was last fetched in full, rather than what was published since then: OpenAlex ingests a record days to weeks after the publication date, so a publication-date window would step straight over anything indexed behind it. Only an archival backfill is excluded, by ignoring papers published more than 90 days before the coverage mark. arXiv is asked by submission date with a four-day overlap instead, because its own submission index runs two to three days behind.</p>
         <p>Re-asking costs no tokens. Papers are matched against the score cache before any Claude call, so a paper already scored under the current profile is a cache hit and is never sent again; only papers genuinely new to you are scored. Editing the Research profile is the one thing that invalidates that cache.</p>
         <p>The window applies to arXiv too. arXiv is asked for papers submitted inside it, rather than for its RSS feed, which carries only the current announcement batch &mdash; so a day missed because a run failed or did not happen is picked up by the next successful run.</p>
       </div>
