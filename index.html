@@ -108,6 +108,7 @@
     color: var(--text2);
     padding: 18px 16px 24px;
   }
+  #app-footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
   /* ── Icon rail ──
      Export and Brief act on the feed; Docs and Theme are app-level. Clear cache
@@ -1796,7 +1797,15 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.13';
+const VERSION = 'v3.14';
+
+// One footer credit, shared by the app footer and all four generated pages so
+// the five copies cannot drift. Name links to the author's site, GitHub to the
+// source, MIT to the licence.
+const REPO_URL = 'https://github.com/eabarnes1010/litmonitor';
+const SITE_URL = 'https://barnes-research.com/';
+const LICENSE_URL = 'https://opensource.org/license/mit';
+const CREDIT_HTML = `LitMonitor Earth ${VERSION} &middot; Built by <a href="${SITE_URL}" target="_blank" rel="noopener">Elizabeth A. Barnes</a> &middot; <a href="${REPO_URL}" target="_blank" rel="noopener">GitHub</a> &middot; <a href="${LICENSE_URL}" target="_blank" rel="noopener">MIT License</a> &middot; 2026`;
 
 // ── JOURNAL SOURCES ──────────────────────────────────────────────────────────
 // type: "openalex" → direct API call, no proxy needed (preferred)
@@ -4280,6 +4289,7 @@ ${PAGE_SCORE_CSS}
   .copy-cite-btn:hover{background:var(--border)}
   .copy-cite-btn.copied{color:var(--accent);border-color:var(--accent)}
   footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+  footer a{color:inherit;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -4290,7 +4300,7 @@ ${PAGE_SCORE_CSS}
     <div class="dateline">${timestamp} &middot; ${visible.length} papers &middot; min score ${document.getElementById('min-score').value}${currentFilter !== 'all' ? ' &middot; filter: ' + currentFilter : ''}${searchQuery ? ' &middot; search: &ldquo;' + escHtml(searchQuery) + '&rdquo;' : ''}</div>
   </div>
   ${cards}
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
+  <footer>${CREDIT_HTML}</footer>
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
@@ -5604,7 +5614,7 @@ document.title = `LitMonitor Earth ${VERSION}`;
   if (mark) mark.dataset.tip = `LitMonitor Earth ${VERSION}`;
 })();
 document.getElementById('app-footer').innerHTML =
-  `LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026`;
+  `${CREDIT_HTML}`;
 
 buildJournalList();
 loadState();
@@ -5855,6 +5865,7 @@ ${pageIcon()}
   .wm-sub{font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text2);font-style:normal;vertical-align:middle;margin-left:0.4rem}
   .loading{font-size:0.9rem;color:var(--text2);font-style:italic;padding:1.5rem 0}
   footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+  footer a{color:inherit;text-decoration:underline}
 </style>
 </head><body>
 <div class="wrap">
@@ -5862,7 +5873,7 @@ ${pageIcon()}
     <div class="wordmark"><span class="wm-monitor">LitMonitor</span><span class="wm-earth"> Earth</span><span class="wm-sub">Research Brief</span></div>
   </div>
   <p class="loading">Reading ${toBrief.length} paper${toBrief.length !== 1 ? 's' : ''} and writing the brief — please wait…</p>
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
+  <footer>${CREDIT_HTML}</footer>
 </div></body></html>`);
 
   setRailBusy(briefBtn, true, 'Generating the Brief…');
@@ -6109,6 +6120,7 @@ ${PAGE_SCORE_CSS}
   .copy-cite-btn:hover{background:var(--border)}
   .copy-cite-btn.copied{color:var(--accent);border-color:var(--accent)}
   footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+  footer a{color:inherit;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -6122,7 +6134,7 @@ ${PAGE_SCORE_CSS}
   <div class="synthesis">${synthesisHtml}</div>
   <h2 class="refs-head">References</h2>
   ${cards}
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
+  <footer>${CREDIT_HTML}</footer>
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}
@@ -6471,6 +6483,7 @@ ${pageIcon()}
      button; in running text they take the type size instead. */
   .ui-label svg{width:1.05em;height:1.05em;vertical-align:-0.17em;margin-right:0.3em}
   footer{font-size:0.72rem;color:var(--text3);text-align:center;margin-top:3rem}
+  footer a{color:inherit;text-decoration:underline}
   .dl-btn{position:fixed;top:1rem;right:1rem;background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--radius-sm);padding:0.4rem 0.9rem;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 </style>
 </head>
@@ -6756,7 +6769,7 @@ ${pageIcon()}
     <p>The <span class="ui-label">${railIcon('profile-btn')}Research profile</span> panel is opened from the left rail rather than living in the sidebar: it is set once and then left alone for months, and in the sidebar it pushed the journal list and the fetch settings below the fold every session. Opening it narrows the feed rather than covering it, and Escape closes it. The panel state is not saved.</p>
   </div>
 
-  <footer>LitMonitor Earth ${VERSION} &middot; Built by Elizabeth A. Barnes &middot; 2026</footer>
+  <footer>${CREDIT_HTML}</footer>
 </div>
 <script>
 function dlPage(fn){var h='<!DOCTYPE html>'+document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href)}

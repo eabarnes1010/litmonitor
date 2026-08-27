@@ -147,4 +147,4 @@ To spend less, in order of effect: put terms in the arXiv.cs filter, leave the H
 
 ## License
 
-[CC BY 4.0](LICENSE). Built by Elizabeth A. Barnes · 2026.
+[MIT](LICENSE). Built by [Elizabeth A. Barnes](https://barnes-research.com/) · [source](https://github.com/eabarnes1010/litmonitor) · 2026.
