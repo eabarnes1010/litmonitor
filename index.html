@@ -1797,7 +1797,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.16';
+const VERSION = 'v3.17';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -5084,9 +5084,7 @@ async function runFetchAndScore() {
   // Preprint/published deduplication. The same paper arrives once as an arXiv
   // or EarthArXiv preprint and again as the journal version, under different
   // ids, so the id-only pass above leaves both. See dedupePreprints().
-  const beforeDedup = allPapers.length;
   allPapers = dedupePreprints(allPapers);
-  const preprintDupes = beforeDedup - allPapers.length;
 
   // arXiv.cs filter. Applied only to feeds flagged highVolume in JOURNALS —
   // and before anything is sent anywhere, so a rejected paper costs nothing.
@@ -5094,13 +5092,11 @@ async function runFetchAndScore() {
   const domainTerms = arxivFilterTerms(
     document.getElementById('domain-terms-input').value,
     document.getElementById('methods-input').value);
-  let filteredOut = 0;
   if (domainTerms.length) {
     allPapers = allPapers.filter(p => {
       if (!p.highVolume) return true;
       p.priorityAuthor = paperMatchesPriority(p.allAuthors || p.authors, prioritySet);
       if (passesArxivFilter(p, domainTerms)) return true;
-      filteredOut++;
       return false;
     });
   }
@@ -5109,7 +5105,6 @@ async function runFetchAndScore() {
   // This runs before the cap: a dismissed paper used to occupy a cap slot, so a
   // run could be trimmed to 1000 and then shrink further, and the message told
   // the PI to narrow the window when there was in fact room.
-  const dismissedCount = allPapers.filter(p => dismissed.has(p.id)).length;
   allPapers = allPapers.filter(p => !dismissed.has(p.id));
 
   // Hard cap: never score more than 1000 papers in a single run
@@ -5352,11 +5347,14 @@ async function runFetchAndScore() {
   // clock and advances only on a clean run, so it must not double as the run stamp.
   lsSet('litmonitor_last_run', now.toISOString());
   lsSet('litmonitor_last_run_count', scored.length);
+  // The status line is deliberately lean: the run's headline (scored/shown, and
+  // Haiku drops) plus the two things most people look for — how many came from
+  // cache — and only the genuine exceptions (papers that failed to score, an
+  // early stop, storage full). The incidental bookkeeping that used to trail
+  // here (the arXiv term-filter count, dismissed-skipped, preprint duplicates,
+  // an unpriced model) was noise that buried the numbers that matter.
   const cacheNote     = cachedResults.length ? ` · ${cachedResults.length} from cache` : '';
   const stoppedNote   = abortRequested ? ' · stopped early' : '';
-  const dismissedNote = dismissedCount > 0 ? ` · ${dismissedCount} dismissed skipped` : '';
-  const dupeNote      = preprintDupes > 0 ? ` · ${preprintDupes} preprint duplicates merged` : '';
-  const gateNote      = filteredOut > 0 ? ` · ${filteredOut} arXiv papers didn't match your filter terms` : '';
   // A paper at score 0 failed twice and is below any min-score, so it vanishes
   // from the feed. Saying so is the difference between "quiet run" and "silently
   // lost 20 papers".
@@ -5366,16 +5364,15 @@ async function runFetchAndScore() {
   // Papers are attributed here; the tokens themselves were folded in per call.
   // Only papers actually sent are attributed; an aborted run used to claim the
   // whole uncached set, which then deflated the measured dollars per paper.
+  // No money in this line: every figure lives in the Spend row in the sidebar
+  // footer, which states the run, the month, the papers and the rate date in one
+  // place. An unpriced model is flagged there too, not repeated here.
   addSpend({ papers: newScored.length }, now);
   renderSpend();
-  // No money in this line. Every figure lives in the Spend row in the sidebar
-  // footer, which states the run, the month, the papers and the rate date in
-  // one place; repeating any of it here is what "the pricing is repeated" was.
-  const costNote = runUsage.unpriced ? ' · includes an unpriced model' : '';
   const runDateTime = shortWhen(now);
   setStatus(haikusPrefilter && uncachedPapers.length > 0
-    ? `last run: ${runDateTime} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku${cacheNote}${gateNote}${dismissedNote}${dupeNote}${failedNote}${stoppedNote}${costNote}${storageNote}`
-    : `last run: ${runDateTime} · ${scored.length} papers scored${cacheNote}${gateNote}${dismissedNote}${dupeNote}${failedNote}${stoppedNote}${costNote}${storageNote}`);
+    ? `last run: ${runDateTime} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku${cacheNote}${failedNote}${stoppedNote}${storageNote}`
+    : `last run: ${runDateTime} · ${scored.length} papers scored${cacheNote}${failedNote}${stoppedNote}${storageNote}`);
 
   renderPapers();
 }
