@@ -1797,7 +1797,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.14';
+const VERSION = 'v3.15';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -2254,10 +2254,16 @@ function loadState() {
     // fills the box with DEFAULT_DOMAIN_TERMS.
     const domainTerms = localStorage.getItem('litmonitor_domain_terms');
     document.getElementById('domain-terms-input').value = domainTerms === null ? '' : domainTerms;
-    const lastFetch = localStorage.getItem('litmonitor_last_fetch');
-    const lastCount = localStorage.getItem('litmonitor_last_count');
-    if (lastFetch) {
-      const dt = new Date(lastFetch);
+    // "last run" is when a run last FINISHED, clean or not — it answers "when did
+    // I last press Fetch". It is deliberately not litmonitor_last_fetch, which
+    // advances only on a fully clean run and so froze a week behind whenever one
+    // source kept failing, making the panel claim "7 days ago" ten minutes after
+    // a run. litmonitor_last_run / _last_run_count are written on every finished
+    // run (see runFetchAndScore); last_fetch stays the coverage clock for Auto.
+    const lastRun = localStorage.getItem('litmonitor_last_run');
+    const lastCount = localStorage.getItem('litmonitor_last_run_count');
+    if (lastRun) {
+      const dt = new Date(lastRun);
       const diffMs = Date.now() - dt.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -3263,6 +3269,31 @@ function markSourceCovered(keys, whenIso) {
   const covered = loadSourceCovered();
   keys.forEach(k => { covered[k] = whenIso; });
   lsSet(SOURCE_COVERED_KEY, JSON.stringify(covered), true);
+}
+
+// An arXiv source is fetched in two halves: today's announcement feed, and the
+// date window. When only the feed drops — cs.LG's announcement is far larger
+// than the free relays reliably serve, so it is the one that drops — the window
+// half still answered, and the arXiv window ledger (arxiv_covered) already
+// records the newest submission date it actually returned. Freezing the source
+// mark at the last fully clean run instead let such a source never advance,
+// which grew the Auto window one day per calendar day without bound. So advance
+// each non-trimmed arXiv source's mark to its window ledger's `to`, but only
+// forward: a source already marked at a clean run-time instant (newer than the
+// lagging submission date) must never be walked backwards. The feed failure is
+// still reported as a partial each run, so nothing is hidden — only the window
+// math is kept honest about what was genuinely covered.
+function advanceArxivCoverageToWindow(journals, trimmed) {
+  const arxivCov = loadArxivCovered();
+  const srcCov   = loadSourceCovered();
+  journals.forEach(j => {
+    if (j.type === 'openalex' || trimmed.has(j.name)) return;
+    const cat = (j.rss.match(/\/rss\/(.+)$/) || [])[1];
+    const to  = cat && arxivCov[cat] && Date.parse(arxivCov[cat].to);
+    if (!isFinite(to)) return;                       // window never advanced this source
+    const cur = Date.parse(srcCov[coverageKey(j)]);
+    if (!isFinite(cur) || to > cur) markSourceCovered([coverageKey(j)], new Date(to).toISOString());
+  });
 }
 
 // The window one source is owed. Auto reaches back to that source's last
@@ -5041,7 +5072,12 @@ async function runFetchAndScore() {
     const emptyFailed = fetchErrors.length
       ? ` · ${fetchErrors.length} source${fetchErrors.length === 1 ? '' : 's'} failed`
       : '';
-    setStatus(`last run: ${shortWhen(new Date())} · no papers found${emptyFailed}`);
+    const emptyNow = new Date();
+    // A finished run, even an empty one: record when it ran so the panel is right
+    // on the next load (see the load-time reader). Separate from litmonitor_last_fetch.
+    lsSet('litmonitor_last_run', emptyNow.toISOString());
+    lsSet('litmonitor_last_run_count', 0);
+    setStatus(`last run: ${shortWhen(emptyNow)} · no papers found${emptyFailed}`);
     return;
   }
 
@@ -5106,6 +5142,11 @@ async function runFetchAndScore() {
     markSourceCovered(selectedJournals
       .filter(j => coveredOk.has(coverageKey(j)) && !trimmed.has(j.name))
       .map(coverageKey), nowIso);
+    // A partial arXiv source (feed dropped, window answered) is still covered up
+    // to the submission date its window returned; advance its mark to that so a
+    // chronically flaky feed cannot grow the Auto window without bound. Monotonic:
+    // never regresses a source the clean pass above just marked at run time.
+    advanceArxivCoverageToWindow(selectedJournals, trimmed);
   }
 
   // Step 1.5: Split by score cache — skip re-scoring papers already seen by Sonnet
@@ -5314,6 +5355,11 @@ async function runFetchAndScore() {
     lsSet('litmonitor_last_fetch', now.toISOString());
     lsSet('litmonitor_last_count', scored.length);
   }
+  // Written on every finished run, clean or not — this is what the load-time panel
+  // reads for "last run: N ago". litmonitor_last_fetch above is the Auto coverage
+  // clock and advances only on a clean run, so it must not double as the run stamp.
+  lsSet('litmonitor_last_run', now.toISOString());
+  lsSet('litmonitor_last_run_count', scored.length);
   const cacheNote     = cachedResults.length ? ` · ${cachedResults.length} from cache` : '';
   const stoppedNote   = abortRequested ? ' · stopped early' : '';
   const dismissedNote = dismissedCount > 0 ? ` · ${dismissedCount} dismissed skipped` : '';
@@ -6547,7 +6593,7 @@ ${pageIcon()}
       <div class="field-name">Fetch days back</div>
       <div class="field-body">
         <p>How far back to look. The slider covers <strong>1&ndash;30 days</strong>, with <strong>Auto</strong> at its left-hand stop; type into the box for any window up to 99 days, or type <em>Auto</em>.</p>
-        <p><strong>Auto</strong> asks each source for everything since <em>that source</em> was last fetched in full, rounded up and reported in the status line. Coverage is recorded per source, so a relay that has been failing for a fortnight is asked for the whole fortnight on the next run that works, while the sources that were fine are asked only for the recent window. A source is recorded as covered only when it answered without error, without a partial, and without having its papers trimmed by the 1,000-paper cap. The window Auto settles on is the one named in the status line while the run is going, and it carries a four-day overlap so a source that reports late is not stepped over.</p>
+        <p><strong>Auto</strong> asks each source for everything since <em>that source</em> was last fetched in full, rounded up and reported in the status line. Coverage is recorded per source, so a relay that has been failing for a fortnight is asked for the whole fortnight on the next run that works, while the sources that were fine are asked only for the recent window. A source is recorded as covered up to the moment it answered in full &mdash; no error, no partial, nothing trimmed by the 1,000-paper cap. An arXiv source is the one exception: it is fetched in two halves, today's announcement feed and the date window, and if only its feed drops &mdash; a large category's announcement can be too big for the free relays &mdash; it is still recorded as covered up to the newest submission date its window returned, so one chronically flaky feed cannot keep widening the window for every source. The window Auto settles on is the one named in the status line while the run is going, and it carries a four-day overlap so a source that reports late is not stepped over.</p>
         <p>A source with no record at all &mdash; a journal you just added, or a first run &mdash; has no history to catch up on, so it gets the ordinary window instead.</p>
         <p>Catching up asks a different question of each kind of source, whether or not the window is wide. A journal is asked what OpenAlex has <em>added</em> since it was last fetched in full, rather than what was published since then: OpenAlex ingests a record days to weeks after the publication date, so a publication-date window would step straight over anything indexed behind it. Only an archival backfill is excluded, by ignoring papers published more than 90 days before the coverage mark. arXiv is asked by submission date with a four-day overlap instead, because its own submission index runs two to three days behind.</p>
         <p>Re-asking costs no tokens. Papers are matched against the score cache before any Claude call, so a paper already scored under the current profile is a cache hit and is never sent again; only papers genuinely new to you are scored. Editing the Research profile is the one thing that invalidates that cache.</p>
