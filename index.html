@@ -309,6 +309,12 @@
     overflow: hidden;
     overflow-wrap: anywhere;
   }
+  /* The line is the drill-down into the run: clicking it opens the per-source
+     fetch digest in the message area. Kept as a subtle affordance, not a button,
+     so the trimmed status text is untouched. */
+  #status-line { cursor: pointer; }
+  #status-line:hover { color: var(--text2); text-decoration: underline; text-underline-offset: 2px; }
+  #status-line:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
   .head-actions { display: flex; gap: 8px; }
 
   /* ── Buttons ──
@@ -1539,7 +1545,7 @@
       <div class="head-actions">
         <button class="btn btn-ghost btn-stop" id="stop-btn" style="display:none" data-tip="Stop after the batch already in flight. Papers scored so far are kept.">&#9632; Stop</button>
       </div>
-      <span id="status-line" aria-live="polite">ready</span>
+      <span id="status-line" aria-live="polite" role="button" tabindex="0" aria-label="Show the last fetch digest">ready</span>
     </div>
 
     <div class="sidebar-body">
@@ -1797,7 +1803,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.17';
+const VERSION = 'v3.18';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -2434,6 +2440,75 @@ function loadFeed() {
     papers = (parsed.papers || []).map(p => ({ ...p, date: p.date ? new Date(p.date) : null }));
     newIdsThisRun = new Set(parsed.newIds || []);
   } catch(e) { papers = []; newIdsThisRun = new Set(); }
+}
+
+// ── LAST-FETCH DIGEST ─────────────────────────────────────────────────────────
+// A behind-the-scenes record of the most recent run: how many papers each
+// selected source returned, which sources failed or came back partial, and the
+// run totals. It exists to catch fetch problems — a source quietly returning
+// nothing, a relay that is down — that the lean status line does not itemise.
+// Counts only (no titles/authors), so it stays a few hundred bytes. Written on
+// every finished run, including one that found nothing; read on demand when the
+// status line is clicked.
+const DIGEST_KEY = 'litmonitor_last_digest';
+
+function saveDigest(d) {
+  // quiet: the digest is a convenience, never worth a storage-full warning of
+  // its own when the feed and caches already raise one.
+  lsSet(DIGEST_KEY, JSON.stringify(d), true);
+}
+
+function loadDigest() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DIGEST_KEY) || 'null');
+    return d && Array.isArray(d.sources) ? d : null;
+  } catch { return null; }
+}
+
+// Plain text, one source per line, so it survives the message area's
+// white-space: pre-line (which would collapse a padded ASCII table). Sources are
+// ordered by count descending, ties by name, so the sources that returned
+// nothing cluster at the foot where a fetch problem is easiest to spot.
+function formatDigest(d) {
+  const when = d.when ? shortWhen(new Date(d.when)) : 'unknown time';
+  const rows = d.sources.slice().sort((a, b) =>
+    (b.count - a.count) || a.name.localeCompare(b.name));
+  const lines = rows.map(s => {
+    const flag = s.failed ? ' ⚠ failed' : (s.partial ? ' · partial' : '');
+    // Shown only where there is something to say, so a first run (nothing cached)
+    // and a failed source (nothing fetched) stay clean. Cache hits are served
+    // from the Sonnet cache and skip the prefilter, so this accounts for the
+    // papers the "cut by Haiku" figure — over the uncached papers only — does not.
+    const cached = (s.cached > 0 && !s.failed) ? ` · ${s.cached} cached` : '';
+    // Only when the prefilter actually ran, and never on a failed source (which
+    // fetched nothing, so "0 cut" would be noise). The count is absolute — papers
+    // of this source Haiku dropped — not a fraction of its fetched count.
+    const haiku = (d.prefiltered && !s.failed) ? ` · ${s.haikuDropped || 0} cut by Haiku` : '';
+    return `${s.name} — ${s.count}${flag}${cached}${haiku}`;
+  });
+  const t = d.totals || {};
+  const parts = [];
+  if (t.fetched != null) parts.push(`${t.fetched} fetched`);
+  if (t.kept    != null) parts.push(`${t.kept} after dedup/filter`);
+  if (t.cached)          parts.push(`${t.cached} from cache`);
+  if (t.haikuDropped)    parts.push(`${t.haikuDropped} dropped by Haiku`);
+  if (t.scored  != null) parts.push(`${t.scored} scored`);
+  const header = `Last fetch · ${when} · ${rows.length} source${rows.length === 1 ? '' : 's'}`;
+  const footer = parts.length ? `\n\n${parts.join(' · ')}` : '';
+  return `${header}\n\n${lines.join('\n')}${footer}`;
+}
+
+function showDigest() {
+  const d = loadDigest();
+  if (!d) {
+    showNotice('No fetch has run yet in this browser — run Fetch & Score, then click the status line to see how many papers each source returned.');
+    return;
+  }
+  // Asked for explicitly, so it always shows (no mute), and a repeated click
+  // replaces rather than stacks its own message.
+  document.getElementById('error-area')
+    .querySelectorAll('.digest-msg').forEach(el => el.remove());
+  addMessage(formatDigest(d), 'notice-msg digest-msg', 'ℹ');
 }
 
 // ── LEARNED EXAMPLES ──────────────────────────────────────────────────────────
@@ -5025,6 +5100,21 @@ async function runFetchAndScore() {
   // rest of the pipeline sees exactly what it saw when this was serial.
   results.forEach(list => { if (list) allPapers.push(...list); });
 
+  // Per-source tally for the last-fetch digest, taken here while results[i] still
+  // maps 1:1 to selectedJournals[i] and before any dedup/filter — this is the
+  // raw "papers from each journal" the digest reports. Totals are filled in once
+  // the run finishes (see the completion block); saved even on an empty run.
+  const digest = {
+    when: null,
+    sources: selectedJournals.map((j, i) => ({
+      name: j.name,
+      count: (results[i] || []).length,
+      failed: fetchErrors.some(e => e.startsWith(j.name + ':')),
+      partial: partialNotes.some(n => n.source === j.name)
+    })),
+    totals: { fetched: allPapers.length }
+  };
+
   showProgress(selectedJournals.length, selectedJournals.length, `Fetched ${allPapers.length} papers from ${selectedJournals.length - fetchErrors.length} journals`);
 
   // A failed or partial source does not advance litmonitor_last_fetch (see
@@ -5069,6 +5159,10 @@ async function runFetchAndScore() {
     // on the next load (see the load-time reader). Separate from litmonitor_last_fetch.
     lsSet('litmonitor_last_run', emptyNow.toISOString());
     lsSet('litmonitor_last_run_count', 0);
+    // A run that found nothing is exactly when the digest earns its keep: it says
+    // whether every source genuinely returned nothing or one of them failed.
+    digest.when = emptyNow.toISOString();
+    saveDigest(digest);
     setStatus(`last run: ${shortWhen(emptyNow)} · no papers found${emptyFailed}`);
     return;
   }
@@ -5136,6 +5230,10 @@ async function runFetchAndScore() {
     advanceArxivCoverageToWindow(selectedJournals, trimmed);
   }
 
+  // What survived dedup, preprint collapse, the arXiv.cs filter, the dismissed
+  // set and the cap — the digest's "after dedup/filter" figure.
+  digest.totals.kept = allPapers.length;
+
   // Step 1.5: Split by score cache — skip re-scoring papers already seen by Sonnet
   const cachedResults = [];
   const uncachedPapers = [];
@@ -5148,6 +5246,15 @@ async function runFetchAndScore() {
       uncachedPapers.push(p);
     }
   });
+
+  // Per-source cache hits for the digest, tallied by the source name each paper
+  // carries — the same pattern as the Haiku tally below. Cached papers were
+  // served from the Sonnet score cache and never reach the prefilter, so a
+  // source's "cut by Haiku" is over its uncached papers only; the cached figure
+  // is what accounts for the rest.
+  const cachedBySource = {};
+  cachedResults.forEach(p => { cachedBySource[p.journal] = (cachedBySource[p.journal] || 0) + 1; });
+  digest.sources.forEach(s => { s.cached = cachedBySource[s.name] || 0; });
 
   // Step 1.6: resolve the prefilter's own cache before anything is priced.
   // A paper Haiku has already dropped under this profile is dropped again for
@@ -5270,6 +5377,18 @@ async function runFetchAndScore() {
           haikuScored.filter(p => p.score === 0 || p.score > haikuThreshold));
       }
       haikuFilteredCount = uncachedPapers.length - survivors.length;
+      // Per-source Haiku drops for the digest: which feeds the prefilter thins
+      // most. Dropped = an uncached paper that did not survive (covers both a
+      // fresh Haiku call and a cached Haiku score); tallied by the source name
+      // each paper carries. Recorded even on an abort, so a stopped run's digest
+      // still reflects what the prefilter had decided.
+      const survivorIds = new Set(survivors.map(p => p.id));
+      const haikuBySource = {};
+      uncachedPapers.forEach(p => {
+        if (!survivorIds.has(p.id)) haikuBySource[p.journal] = (haikuBySource[p.journal] || 0) + 1;
+      });
+      digest.sources.forEach(s => { s.haikuDropped = haikuBySource[s.name] || 0; });
+      digest.prefiltered = true;
       if (!abortRequested) {
         const cachedNote = haikuFromCache ? ` (${haikuFromCache} from cache)` : '';
         const bypassNote = priorityBypassed ? ` · ${priorityBypassed} priority-author papers skipped the prefilter` : '';
@@ -5347,6 +5466,14 @@ async function runFetchAndScore() {
   // clock and advances only on a clean run, so it must not double as the run stamp.
   lsSet('litmonitor_last_run', now.toISOString());
   lsSet('litmonitor_last_run_count', scored.length);
+  // Complete the digest with the run totals and persist it. Clicking the status
+  // line reads this back, so the behind-the-scenes counts outlive the message
+  // area (which clears each run) and survive a reload.
+  digest.when = now.toISOString();
+  digest.totals.cached = cachedResults.length;
+  digest.totals.haikuDropped = haikuFilteredCount;
+  digest.totals.scored = scored.length;
+  saveDigest(digest);
   // The status line is deliberately lean: the run's headline (scored/shown, and
   // Haiku drops) plus the two things most people look for — how many came from
   // cache — and only the genuine exceptions (papers that failed to score, an
@@ -6842,6 +6969,17 @@ document.getElementById('papers-container').addEventListener('click', e => {
 });
 
 document.getElementById('fetch-btn').addEventListener('click', fetchAndScore);
+
+// The status line drills down into the last run's per-source digest. role=button
+// + tabindex in the markup make it reachable by keyboard; Enter/Space match a
+// button's activation.
+(() => {
+  const status = document.getElementById('status-line');
+  status.addEventListener('click', showDigest);
+  status.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showDigest(); }
+  });
+})();
 
 // A proxy, not a second implementation: the API key, profile and journal checks
 // all live behind the sidebar's button and are still the only copy of them.
