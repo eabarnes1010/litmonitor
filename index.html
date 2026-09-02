@@ -1803,7 +1803,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.18';
+const VERSION = 'v3.19';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -2486,12 +2486,18 @@ function formatDigest(d) {
     const haiku = (d.prefiltered && !s.failed) ? ` · ${s.haikuDropped || 0} cut by Haiku` : '';
     return `${s.name} — ${s.count}${flag}${cached}${haiku}`;
   });
+  // The footer is a complete ledger of the run, so every stage that had a number
+  // is shown even when it is zero — a hidden "0 from cache" reads as "cache not
+  // considered". "kept after de-duplication and filtering" is the papers left
+  // after the id and preprint dedup, the arXiv.cs term filter, the dismissed
+  // list and the 1,000-paper cap. The Haiku total is shown only when the
+  // prefilter actually ran, matching the per-source "cut by Haiku".
   const t = d.totals || {};
   const parts = [];
   if (t.fetched != null) parts.push(`${t.fetched} fetched`);
-  if (t.kept    != null) parts.push(`${t.kept} after dedup/filter`);
-  if (t.cached)          parts.push(`${t.cached} from cache`);
-  if (t.haikuDropped)    parts.push(`${t.haikuDropped} dropped by Haiku`);
+  if (t.kept    != null) parts.push(`${t.kept} kept after de-duplication and filtering`);
+  if (t.cached  != null) parts.push(`${t.cached} from cache`);
+  if (d.prefiltered)     parts.push(`${t.haikuDropped || 0} dropped by Haiku`);
   if (t.scored  != null) parts.push(`${t.scored} scored`);
   const header = `Last fetch · ${when} · ${rows.length} source${rows.length === 1 ? '' : 's'}`;
   const footer = parts.length ? `\n\n${parts.join(' · ')}` : '';
