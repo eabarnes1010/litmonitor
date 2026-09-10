@@ -143,6 +143,7 @@ To spend less, in order of effect: put terms in the arXiv.cs filter, leave the H
 - Messages above the cards can be dismissed with the **×** at their right. A run that still has something to report says so again.
 - Papers found in more than one source are merged, preprint with published version, keeping whichever abstract exists.
 - The app is one HTML file, so you can save a copy and keep it.
+- **Stay current.** When you open the hosted app and a newer version has shipped, a small amber **refresh to update** banner appears above the cards — click **Refresh** to load it. It remembers a dismissal until the next new version. A saved local copy does not check for updates. The running version is in the browser-tab title and the footer.
 
 ---
 
