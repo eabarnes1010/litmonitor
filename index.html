@@ -1803,7 +1803,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.19';
+const VERSION = 'v3.20';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -1911,7 +1911,8 @@ const JOURNALS = [
     id: "frontiers-earth-sci",
     name: "Frontiers in Earth Science",
     type: "openalex",
-    openalexSourceId: "S178385311"
+    openalexSourceId: "S178385311",
+    crossrefIssn: "2296-6463"
   },
   {
     id: "frontiers-envs",
@@ -2001,19 +2002,24 @@ const JOURNALS = [
     id: "nature-food",
     name: "Nature Food",
     type: "openalex",
-    openalexSourceId: "S4210207988"
+    openalexSourceId: "S4210207988",
+    crossrefIssn: "2662-1355"
   },
   {
     id: "nature-geo",
     name: "Nature Geoscience",
     type: "openalex",
-    openalexSourceId: "S48977010"
+    openalexSourceId: "S48977010",
+    crossrefIssn: "1752-0894"
   },
   {
     id: "nature-mi",
     name: "Nature Machine Intelligence",
     type: "openalex",
-    openalexSourceId: "S4306400806"
+    // Was source ID S4306400806, which OpenAlex resolves to Europe PMC (a
+    // biomedical repository), not this journal — so this feed pulled the wrong
+    // content. Corrected to the real Nature Machine Intelligence ISSN (v3.20).
+    openalexIssn: "2522-5839"
   },
   {
     id: "nature-reviews-earth-env",
@@ -2022,21 +2028,22 @@ const JOURNALS = [
     openalexIssn: "2662-138X"
   },
   {
-    // Both sides of the v3.9 merge added Nature Sustainability. This is the id
-    // and source read from the OpenAlex sources API on the settings-backup
-    // branch, and the one a stored journal selection may already name, so the
-    // ISSN entry that came in with the ten borrowed journals was dropped rather
-    // than left to sit beside it as a second, unchecked copy of one journal.
+    // The v3.9 merge stored source ID S4210178125 for Nature Sustainability, but
+    // OpenAlex resolves that ID to Nature Reviews Earth & Environment (already
+    // listed below by ISSN 2662-138X) — so this feed duplicated that journal and
+    // true Nature Sustainability was never fetched. Corrected to the real Nature
+    // Sustainability ISSN (v3.20).
     id: "nature-sustain",
     name: "Nature Sustainability",
     type: "openalex",
-    openalexSourceId: "S4210178125"
+    openalexIssn: "2398-9629"
   },
   {
     id: "nature-water",
     name: "Nature Water",
     type: "openalex",
-    openalexSourceId: "S4387286383"
+    openalexSourceId: "S4387286383",
+    crossrefIssn: "2731-6084"
   },
   {
     id: "npj-climate",
@@ -3618,6 +3625,78 @@ async function fetchOpenAlex(identifier, journalName, cutoff, isPreprint, sinceC
   return { papers: results, total, capped: total > seen };
 }
 
+// ── FETCH FROM CROSSREF (no proxy, no daily cap — 10 req/s politeness only) ─────
+// Primary source for every journal that has an ISSN. OpenAlex retired its
+// effectively-unlimited polite pool in 2026 for a per-IP budget of 1000 requests
+// / $0.10 per ~12.5 h window; a shared institutional or VPN IP drains that before
+// a single daily run finishes, which is why every OpenAlex source began failing
+// at once. Crossref has no such cap. Returns the same { papers, total, capped }
+// shape as fetchOpenAlex so fetchOne can treat the two interchangeably and fall
+// back from one to the other per source.
+//
+// Abstracts arrive as JATS XML, and many publishers (the Nature family in
+// particular) deposit none at all; both cases are healed downstream by
+// enrichAbstracts() keyed on the DOI, exactly as the OpenAlex path already relies
+// on — every Crossref work carries a DOI, so nothing is lost by the swap.
+const CROSSREF_ROWS = 1000;   // Crossref's own per-request maximum: one request per source
+
+function stripJats(xml) {
+  // JATS abstracts are wrapped in <jats:*> tags and usually open with a redundant
+  // "Abstract" title element; drop the tags, collapse the whitespace they leave,
+  // and shed that leading word so the scorer sees the same plain text OpenAlex gives.
+  return xml
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s*Abstract[:.]?\s*/i, '')
+    .trim();
+}
+
+async function fetchCrossref(issn, journalName, cutoff, isPreprint, sinceCreated) {
+  const fromPub = cutoff.toISOString().split('T')[0];
+  // OpenAlex asked "added since last run" via from_created_date so a paper indexed
+  // late is never stepped over; Crossref's from-index-date is the same idea — the
+  // day Crossref last (re)indexed the record — with from-pub-date as the backfill floor.
+  const sinceFilter = sinceCreated
+    ? `,from-index-date:${new Date(sinceCreated).toISOString().split('T')[0]}`
+    : '';
+  const url = `https://api.crossref.org/journals/${encodeURIComponent(issn)}/works`
+    + `?filter=from-pub-date:${fromPub}${sinceFilter}`
+    + `&rows=${CROSSREF_ROWS}&sort=published&order=desc`
+    + `&select=DOI,title,author,published,abstract`
+    + `&mailto=litmonitor@user`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!resp.ok) throw new Error(`Crossref API error ${resp.status}`);
+  const data = await resp.json();
+  const msg = data.message || {};
+  const items = msg.items || [];
+  const total = Number(msg['total-results']) || items.length;
+  const results = [];
+  items.forEach(work => {
+    const title = Array.isArray(work.title) ? (work.title[0] || '') : (work.title || '');
+    if (!title) return;
+    // Crossref dates are [year, month, day] arrays; month and day may be absent,
+    // so an incomplete date defaults to the first of the month rather than NaN.
+    const dp = work.published && work.published['date-parts'] && work.published['date-parts'][0];
+    const date = dp ? new Date(dp[0], (dp[1] || 1) - 1, dp[2] || 1) : new Date(NaN);
+    if (cutoff && !isNaN(date) && date < cutoff) return;
+    // Authors are given/family objects (or a bare `name` for a consortium); same
+    // five-shown / fifty-carried split and TeX-accent decoding as the OpenAlex path.
+    const allNames = (work.author || [])
+      .map(a => decodeTexAccents(a.name || [a.given, a.family].filter(Boolean).join(' ')))
+      .filter(Boolean);
+    const authors    = allNames.slice(0, 5).join(', ');
+    const allAuthors = allNames.slice(0, 50).join(', ');
+    const abstract = work.abstract ? stripJats(work.abstract) : '';
+    const doi  = work.DOI ? `https://doi.org/${work.DOI}` : '';
+    const link = doi;
+    const id   = doi || `${title}-${dp ? dp.join('-') : ''}`;
+    results.push({ id, title, authors, allAuthors, abstract, link, date, journal: journalName, preprint: !!isPreprint });
+  });
+  // A window bigger than one request can carry is a partial, not a success — same
+  // rule as OpenAlex, judged against the raw item count before the date filter.
+  return { papers: results, total, capped: total > items.length };
+}
+
 // ── PARSE RSS ─────────────────────────────────────────────────────────────────
 function parseRSS(xml, journalName, cutoff, isPreprint) {
   const parser = new DOMParser();
@@ -5061,13 +5140,31 @@ async function runFetchAndScore() {
         const floor = isFinite(mark)
           ? new Date(mark - OPENALEX_BACKFILL_FLOOR_DAYS * 86400000)
           : cutoff;
-        const oa = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, floor, j.preprint, sinceCreated);
-        parsed = oa.papers;
+        // Crossref is primary for every journal with an ISSN (no daily cap);
+        // OpenAlex is the per-source fallback used only when Crossref errors for
+        // this one source, and the sole path for an ISSN-less repository such as
+        // EarthArXiv. Because the fallback is per source, even a whole-list Crossref
+        // outage costs at most one OpenAlex request per source — never the burst
+        // that would trip OpenAlex's per-IP budget.
+        const crIssn = j.openalexIssn || j.crossrefIssn;
+        let res;
+        if (crIssn) {
+          try {
+            res = await fetchCrossref(crIssn, j.name, floor, j.preprint, sinceCreated);
+          } catch(e) {
+            res = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, floor, j.preprint, sinceCreated);
+          }
+        } else {
+          res = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, floor, j.preprint, sinceCreated);
+        }
+        parsed = res.papers;
         // Same rule as arXiv: a window bigger than a run can carry is a partial,
-        // not a success, so its oldest days stay askable next time.
-        if (oa.capped) {
+        // not a success, so its oldest days stay askable next time. The 1000 bound
+        // is the same whether the answer came from Crossref (CROSSREF_ROWS) or the
+        // OpenAlex fallback (OPENALEX_PAGES * OPENALEX_PER_PAGE).
+        if (res.capped) {
           partialNotes.push({ source: j.name,
-            reason: `more papers in that window than a run fetches (${oa.total} against ${OPENALEX_PAGES * OPENALEX_PER_PAGE})` });
+            reason: `more papers in that window than a run fetches (${res.total} against ${OPENALEX_PAGES * OPENALEX_PER_PAGE})` });
         }
       } else {
         // The category is read off the feed URL rather than duplicated in
