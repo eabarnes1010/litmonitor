@@ -1322,7 +1322,7 @@
     transition: width 0.3s;
   }
 
-  .error-msg, .notice-msg {
+  .error-msg, .notice-msg, .ok-msg {
     display: flex;
     align-items: flex-start;
     gap: 10px;
@@ -1367,6 +1367,13 @@
     background: color-mix(in srgb, var(--amber) 9%, transparent);
     border: 1px solid color-mix(in srgb, var(--amber) 25%, transparent);
     color: var(--amber-text);
+  }
+  /* A positive, non-error signal — "the run finished, there is just nothing new".
+     Green (the accent), not amber, so it does not read as a warning. */
+  .ok-msg {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    color: var(--accent);
   }
 
   /* ── Tooltip ──
@@ -1806,7 +1813,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.22';
+const VERSION = 'v3.23';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -1871,7 +1878,8 @@ const JOURNALS = [
     id: "earth-system-dynamics",
     name: "Earth System Dynamics",
     type: "openalex",
-    openalexIssn: "2190-4979"
+    openalexIssn: "2190-4979",
+    crossrefIssn: "2190-4987"
   },
   {
     id: "earthsfuture",
@@ -1927,7 +1935,8 @@ const JOURNALS = [
     id: "gmd",
     name: "Geoscientific Model Development",
     type: "openalex",
-    openalexIssn: "1991-959X"
+    openalexIssn: "1991-959X",
+    crossrefIssn: "1991-9603"
   },
   {
     id: "global-environmental-change",
@@ -1945,7 +1954,8 @@ const JOURNALS = [
     id: "hess",
     name: "Hydrology and Earth System Science",
     type: "openalex",
-    openalexIssn: "1027-5606"
+    openalexIssn: "1027-5606",
+    crossrefIssn: "1607-7938"
   },
   {
     id: "james",
@@ -5000,6 +5010,13 @@ function showNotice(msg, kind) {
   addMessage(msg, 'notice-msg', 'ℹ', kind);
 }
 
+// A positive notice: green box, check glyph, same mute-by-kind rule as showNotice
+// so a viewer who does not want even the good news can silence it.
+function showOk(msg, kind) {
+  if (kind && mutedNotices().has(kind)) return;
+  addMessage(msg, 'ok-msg', '✓', kind);
+}
+
 function addMessage(msg, cls, glyph, kind) {
   const area = document.getElementById('error-area');
   const div = document.createElement('div');
@@ -5244,7 +5261,13 @@ async function runFetchAndScore() {
         // EarthArXiv. Because the fallback is per source, even a whole-list Crossref
         // outage costs at most one OpenAlex request per source — never the burst
         // that would trip OpenAlex's per-IP budget.
-        const crIssn = j.openalexIssn || j.crossrefIssn;
+        // Prefer an explicit crossrefIssn when the journal carries one: a few
+        // publishers (Copernicus — GMD, HESS, ESD) register with Crossref under a
+        // different ISSN than OpenAlex uses, and Crossref's /journals/{issn}
+        // endpoint 404s on the wrong one, which silently forced the OpenAlex
+        // fallback and its 429 on every run. Fall back to the OpenAlex ISSN for
+        // the journals whose two ISSNs agree (the majority).
+        const crIssn = j.crossrefIssn || j.openalexIssn;
         let res;
         if (crIssn) {
           try {
@@ -5326,19 +5349,27 @@ async function runFetchAndScore() {
 
   showProgress(selectedJournals.length, selectedJournals.length, `Fetched ${allPapers.length} papers from ${selectedJournals.length - fetchErrors.length} journals`);
 
-  // A failed or partial source does not advance litmonitor_last_fetch (see
-  // below), and the arXiv fetch asks for an explicit window, so the days it
-  // covers are re-requested by the next successful run. Saying so is the
-  // difference between a warning and an alarm.
+  // A run's own diagnostics — a source that could not be reached, a source that
+  // answered only in part, and the 1,000-paper cap — used to stack as up to three
+  // separate amber boxes. They are collected into one "run report" box instead:
+  // one line each, one mute for the set, with the per-source breakdown always a
+  // click away in the digest. A failed or partial source does not advance
+  // litmonitor_last_fetch (see below), and the arXiv fetch asks for an explicit
+  // window, so the days it covers are re-requested by the next successful run —
+  // the header says so once rather than every line repeating it.
+  const runReport = [];
+  const emitRunReport = () => {
+    if (!runReport.length) return;
+    showNotice(`Run notes — nothing you did, and nothing to fix; the days any source missed are asked for again on the next run that reaches it.\n${runReport.join('\n')}`, 'run-report');
+  };
   if (fetchErrors.length) {
-    showNotice(`A source was unreachable — nothing you did, and nothing for you to do. arXiv is read through free public relays and OpenAlex rate-limits, so both drop out from time to time. Papers from the other sources are still scored, and the days this source owes stay marked as not covered, so the next run that reaches it asks for them again.\nUnreachable: ${fetchErrors.join(' | ')}`, 'source-down');
+    runReport.push(`${fetchErrors.length} source${fetchErrors.length === 1 ? '' : 's'} unreachable (a free relay or an API rate-limit): ${fetchErrors.join(' | ')}`);
   }
   // A partial is not a failure: the source answered, but not for the whole
-  // window, so it is reported separately and never subtracted from the count of
-  // sources that worked. Only retrieval partials (a dropped relay, a rate-limit)
-  // are reported here and hold coverage back; a volume cap (kind:'volume') is not
-  // a relay problem and does not, so it is reported by the paper-cap notice below
-  // and advances coverage like a clean source.
+  // window. Only retrieval partials (a dropped relay, a rate-limit) are reported
+  // here and hold coverage back; a volume cap (kind:'volume') is not a relay
+  // problem and does not, so it is reported by the cap line below and advances
+  // coverage like a clean source.
   const retrievalPartials = partialNotes.filter(n => n.kind !== 'volume');
   if (retrievalPartials.length) {
     // One line per reason, not per source: four feeds failing the same way used
@@ -5349,12 +5380,15 @@ async function runFetchAndScore() {
       if (!byReason.has(n.reason)) byReason.set(n.reason, []);
       if (!byReason.get(n.reason).includes(n.source)) byReason.get(n.reason).push(n.source);
     });
-    const lines = [...byReason].map(([reason, sources]) => `${sources.slice().sort().join(', ')} — ${reason}`);
-    showNotice(`Fetched, but not in full — nothing you did, and nothing for you to do. A source answered for part of its window only, which is normal for a free relay. Those days stay marked as not covered, so the next run that works asks for them again.\n${lines.join('\n')}`, 'partial-fetch');
+    [...byReason].forEach(([reason, sources]) =>
+      runReport.push(`${sources.slice().sort().join(', ')} — ${reason}`));
   }
 
   if (allPapers.length === 0) {
     clearProgress();
+    // The cap never runs on an empty fetch, but a source may still have failed or
+    // come back partial — emit whatever the run report has gathered so far.
+    emitRunReport();
     showNotice('No papers found. Try increasing "Fetch days back", or check that journals are selected.');
     fetchBtn.disabled = false;
     stopBtn.style.display = 'none';
@@ -5434,9 +5468,12 @@ async function runFetchAndScore() {
     const advice = arxivTrimmed
       ? 'If it persists, reduce "Fetch days back", or add terms to the arXiv.cs filter, to stay under the limit.'
       : 'If it persists, reduce "Fetch days back" to stay under the limit.';
-    showNotice(`Fetched ${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). ${advice}`, 'paper-cap');
+    runReport.push(`${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). ${advice}`);
     allPapers = capped.kept;
   }
+  // One box for the whole run: the unreachable, partial and cap lines gathered
+  // above are shown together here, after the cap is known.
+  emitRunReport();
 
   // Coverage is written here, after the cap. A source trimmed only by the
   // aggregate cap (it answered in full, but the run held more than 1000 papers)
@@ -5740,6 +5777,18 @@ async function runFetchAndScore() {
   setStatus(haikusPrefilter && uncachedPapers.length > 0
     ? `last run: ${runDateTime} · ${scored.length} shown · ${haikuFilteredCount} dropped by Haiku${cacheNote}${failedNote}${stoppedNote}${storageNote}`
     : `last run: ${runDateTime} · ${scored.length} papers scored${cacheNote}${failedNote}${stoppedNote}${storageNote}`);
+
+  // A same-day re-run re-asks the same day's index and re-serves it from cache,
+  // so the feed looks unchanged and reads as "it keeps showing me the same
+  // papers". Say so plainly, in a green (not amber) box: nothing is wrong, there
+  // is just nothing new since the last run. Only when the run did show papers and
+  // none of them are new — a first run, where everything is new, stays quiet, and
+  // an aborted or all-failed run says its own thing on the status line.
+  const shownCount = scored.filter(p => p.score >= minScore).length;
+  const newShown   = scored.filter(p => newIdsThisRun.has(p.id) && p.score >= minScore).length;
+  if (!abortRequested && shownCount > 0 && newShown === 0) {
+    showOk(`No new papers since your last run — everything shown was scored on an earlier run.`, 'nothing-new');
+  }
 
   renderPapers();
 }
