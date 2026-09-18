@@ -1806,7 +1806,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.21';
+const VERSION = 'v3.22';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -3385,6 +3385,26 @@ function advanceArxivCoverageToWindow(journals, trimmed) {
     const cur = Date.parse(srcCov[coverageKey(j)]);
     if (!isFinite(cur) || to > cur) markSourceCovered([coverageKey(j)], new Date(to).toISOString());
   });
+}
+
+// Which of this run's sources advance their coverage mark. Two ways to earn it:
+//   1. a volume cap — the source hit its own per-request limit, so the newest
+//      papers arrived and re-asking the same window returns the same first 1000
+//      forever; it MUST advance or its window never moves (the deadlock);
+//   2. answering in full (coveredOk) AND surviving the aggregate cap (not trimmed)
+//      — a source cut only by the aggregate cap did answer in full and is left to
+//      refit next run once the volume-capped giants shrink, so its tail is scored
+//      then rather than skipped now.
+// Pure and named so the deadlock fix is testable without driving the whole run;
+// `keyOf` is coverageKey, passed in so the helper carries no closure. `coveredOk`
+// and `volumeCapped` hold coverage keys (a key is unique per source, a name is
+// not); `trimmed` holds source names, matching capPapersFairly's droppedBySource.
+function journalsAdvancingCoverage(journals, keyOf, sets) {
+  // Destructured in the body, not the signature: the test harness brace-matches
+  // the source text and an object-destructured parameter list would throw it off.
+  const { coveredOk, trimmed, volumeCapped } = sets;
+  return journals.filter(j =>
+    volumeCapped.has(keyOf(j)) || (coveredOk.has(keyOf(j)) && !trimmed.has(j.name)));
 }
 
 // The window one source is owed. Auto reaches back to that source's last
@@ -5241,7 +5261,15 @@ async function runFetchAndScore() {
         // is the same whether the answer came from Crossref (CROSSREF_ROWS) or the
         // OpenAlex fallback (OPENALEX_PAGES * OPENALEX_PER_PAGE).
         if (res.capped) {
-          partialNotes.push({ source: j.name,
+          // kind:'volume' marks a partial that re-asking cannot cure — the newest
+          // papers WERE fetched (sort is published/created desc) and only the older
+          // tail was cut. It must advance coverage, unlike a retrieval failure (an
+          // untagged note) whose window really did not arrive and must be re-asked.
+          // The coverage `key` is carried so the advance matches on it, not on the
+          // display `source`: two selected journals can share a name but never a key,
+          // and matching by name would advance the wrong (uncapped) one and skip its
+          // owed papers. Only volume notes carry a key; arXiv/retrieval notes do not.
+          partialNotes.push({ source: j.name, key, kind: 'volume',
             reason: `more papers in that window than a run fetches (${res.total} against ${OPENALEX_PAGES * OPENALEX_PER_PAGE})` });
         }
       } else {
@@ -5307,13 +5335,17 @@ async function runFetchAndScore() {
   }
   // A partial is not a failure: the source answered, but not for the whole
   // window, so it is reported separately and never subtracted from the count of
-  // sources that worked.
-  if (partialNotes.length) {
+  // sources that worked. Only retrieval partials (a dropped relay, a rate-limit)
+  // are reported here and hold coverage back; a volume cap (kind:'volume') is not
+  // a relay problem and does not, so it is reported by the paper-cap notice below
+  // and advances coverage like a clean source.
+  const retrievalPartials = partialNotes.filter(n => n.kind !== 'volume');
+  if (retrievalPartials.length) {
     // One line per reason, not per source: four feeds failing the same way used
     // to print the same sentence four times, and twice each when both halves of
     // the fetch missed.
     const byReason = new Map();
-    partialNotes.forEach(n => {
+    retrievalPartials.forEach(n => {
       if (!byReason.has(n.reason)) byReason.set(n.reason, []);
       if (!byReason.get(n.reason).includes(n.source)) byReason.get(n.reason).push(n.source);
     });
@@ -5391,19 +5423,40 @@ async function runFetchAndScore() {
     const worst = Object.entries(capped.droppedBySource)
       .sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([k, n]) => `${k} −${n}`).join(', ');
-    showNotice(`Fetched ${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). Reduce "Fetch days back" or add terms to the arXiv.cs filter to stay under the limit.`, 'paper-cap');
+    // The arXiv.cs term filter only touches highVolume arXiv feeds, so its advice is
+    // shown only when one of those was actually trimmed — for a journal source (a
+    // Crossref/OpenAlex feed) it does nothing and used to mislead. "Fetch days back"
+    // is the lever that always applies. The count is also self-correcting now: each
+    // over-volume source advances its coverage this run (see below), so the next run
+    // asks it only for what was added since and should fall under the cap on its own.
+    const highVolNames = new Set(JOURNALS.filter(j => j.highVolume).map(j => j.name));
+    const arxivTrimmed = Object.keys(capped.droppedBySource).some(n => highVolNames.has(n));
+    const advice = arxivTrimmed
+      ? 'If it persists, reduce "Fetch days back", or add terms to the arXiv.cs filter, to stay under the limit.'
+      : 'If it persists, reduce "Fetch days back" to stay under the limit.';
+    showNotice(`Fetched ${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). ${advice}`, 'paper-cap');
     allPapers = capped.kept;
   }
 
-  // Coverage is written here, after the cap, because a source whose papers were
-  // trimmed did not deliver its window either — marking it covered would discard
-  // exactly the papers the cap set aside. A stopped run marks nothing.
+  // Coverage is written here, after the cap. A source trimmed only by the
+  // aggregate cap (it answered in full, but the run held more than 1000 papers)
+  // is deliberately NOT advanced: marking it covered would discard exactly the
+  // papers the cap set aside, and once the over-volume giants shrink it will fit
+  // next run and its tail gets scored then. A source that hit its OWN per-request
+  // limit (kind:'volume') is different — re-asking the same window returns the
+  // same first 1000 forever, so it MUST advance or the window never moves; its
+  // from-index-date question then narrows the next run under the cap on its own.
+  // Without this, a single high-volume journal (Nature Communications, Scientific
+  // Reports) froze both the per-source mark and the global clock, and every daily
+  // run re-fetched the same ~30-day window in a permanent deadlock. A stopped run
+  // marks nothing.
   if (!abortRequested) {
     const trimmed = new Set(Object.keys(cappedDropped));
+    const volumeCapped = new Set(partialNotes.filter(n => n.kind === 'volume').map(n => n.key));
     const nowIso = new Date().toISOString();
-    markSourceCovered(selectedJournals
-      .filter(j => coveredOk.has(coverageKey(j)) && !trimmed.has(j.name))
-      .map(coverageKey), nowIso);
+    markSourceCovered(
+      journalsAdvancingCoverage(selectedJournals, coverageKey, { coveredOk, trimmed, volumeCapped })
+        .map(coverageKey), nowIso);
     // A partial arXiv source (feed dropped, window answered) is still covered up
     // to the submission date its window returned; advance its mark to that so a
     // chronically flaky feed cannot grow the Auto window without bound. Monotonic:
@@ -5636,8 +5689,14 @@ async function runFetchAndScore() {
   const now = new Date();
   // Only a clean run advances the clock. An aborted run, or one where a feed
   // failed, has not actually covered its window, and under "Auto" the next run
-  // would otherwise start after the papers it never fetched.
-  const cleanRun = !abortRequested && !fetchErrors.length && !partialNotes.length;
+  // would otherwise start after the papers it never fetched. A volume cap
+  // (kind:'volume') is not such a gap — the newest papers did arrive and the
+  // source's own mark was advanced above — so it does not hold the global clock
+  // back; only a retrieval partial (a dropped relay) does. Otherwise a single
+  // always-capped high-volume journal pinned this clock at its 30-day ceiling,
+  // which is the other half of the deadlock the per-source advance fixes.
+  const retrievalPartialAtEnd = partialNotes.some(n => n.kind !== 'volume');
+  const cleanRun = !abortRequested && !fetchErrors.length && !retrievalPartialAtEnd;
   if (cleanRun) {
     lsSet('litmonitor_last_fetch', now.toISOString());
     lsSet('litmonitor_last_count', scored.length);
