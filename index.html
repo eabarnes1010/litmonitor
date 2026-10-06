@@ -1813,7 +1813,7 @@
 <script>
 // ── VERSION ───────────────────────────────────────────────────────────────────
 // Update this single constant when bumping the version number.
-const VERSION = 'v3.23';
+const VERSION = 'v3.24';
 
 // One footer credit, shared by the app footer and all four generated pages so
 // the five copies cannot drift. Name links to the author's site, GitHub to the
@@ -1892,6 +1892,7 @@ const JOURNALS = [
     name: "EarthArXiv",
     type: "openalex",
     openalexSourceId: "S4306401273",
+    crossrefPrefix: "10.31223",
     preprint: true
   },
   {
@@ -2300,7 +2301,7 @@ function loadState() {
       else if (diffHours < 24) ago = `${diffHours}h ago`;
       else ago = `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
       const countStr = lastCount ? ` · ${lastCount} papers scored` : '';
-      setStatus(`last run: ${ago}${countStr}`);
+      setStatus(`last run: ${shortWhen(dt)} (${ago})${countStr}`);
     }
     const journals = localStorage.getItem('litmonitor_journals');
     const selected = journals ? new Set(JSON.parse(journals)) : new Set(JOURNALS.map(j => j.id));
@@ -2757,6 +2758,21 @@ function capPapersFairly(list, max) {
     if (n) droppedBySource[k] = n;
   });
   return { kept: list.filter(p => keep.has(p)), droppedBySource };
+}
+
+// The cap bounds what a run will PAY for, so it is applied only to papers whose
+// verdict is not already cached. Counting cached papers against it made the
+// round-robin keep the same already-scored heads every run and drop the same
+// unscored tails, so a source trimmed after a long absence never caught up and
+// never advanced its coverage mark (v3.24). Resolved papers pass through free;
+// order is preserved. `droppedBySource` counts only unresolved papers dropped.
+function capUnresolvedPapers(list, max, isResolved) {
+  const pending = list.filter(p => !isResolved(p));
+  if (pending.length <= max) return { kept: list, droppedBySource: {}, pending: pending.length };
+  const capped = capPapersFairly(pending, max);
+  const keep = new Set(capped.kept);
+  return { kept: list.filter(p => keep.has(p) || isResolved(p)),
+           droppedBySource: capped.droppedBySource, pending: pending.length };
 }
 
 // `terms` is the union of the domain list and the method terms. Kept as one
@@ -3684,6 +3700,9 @@ function stripJats(xml) {
     .trim();
 }
 
+// `issn` may instead be a DOI prefix ("10.31223"): a repository with no ISSN —
+// EarthArXiv — is still one Crossref member prefix, so it is asked through
+// /prefixes/ and stays off OpenAlex's per-IP budget. An ISSN never starts "10.".
 async function fetchCrossref(issn, journalName, cutoff, isPreprint, sinceCreated) {
   const fromPub = cutoff.toISOString().split('T')[0];
   // OpenAlex asked "added since last run" via from_created_date so a paper indexed
@@ -3692,7 +3711,8 @@ async function fetchCrossref(issn, journalName, cutoff, isPreprint, sinceCreated
   const sinceFilter = sinceCreated
     ? `,from-index-date:${new Date(sinceCreated).toISOString().split('T')[0]}`
     : '';
-  const url = `https://api.crossref.org/journals/${encodeURIComponent(issn)}/works`
+  const route = /^10\./.test(issn) ? 'prefixes' : 'journals';
+  const url = `https://api.crossref.org/${route}/${encodeURIComponent(issn)}/works`
     + `?filter=from-pub-date:${fromPub}${sinceFilter}`
     + `&rows=${CROSSREF_ROWS}&sort=published&order=desc`
     + `&select=DOI,title,author,published,abstract`
@@ -4925,12 +4945,11 @@ function clearProgress() {
 // into the title attribute where it stays readable.
 // "8/23/2026 4:37:21 PM" is nineteen characters of a line that has to fit in a
 // 300px column, and the seconds were never worth one of them.
+// The date is always shown: a bare "9:14 AM" could not tell a run this morning
+// from one a day earlier, which is the question the line exists to answer.
 function shortWhen(d) {
   const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const today = new Date();
-  const sameDay = d.getFullYear() === today.getFullYear()
-    && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
-  return sameDay ? time : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
 }
 
 function setStatus(text) {
@@ -5267,11 +5286,14 @@ async function runFetchAndScore() {
         // endpoint 404s on the wrong one, which silently forced the OpenAlex
         // fallback and its 429 on every run. Fall back to the OpenAlex ISSN for
         // the journals whose two ISSNs agree (the majority).
+        // EarthArXiv has no ISSN but one DOI prefix, which Crossref serves just as
+        // well; before v3.24 it went to OpenAlex alone and drew a 429 every run.
         const crIssn = j.crossrefIssn || j.openalexIssn;
+        const crId = j.crossrefPrefix || crIssn;
         let res;
-        if (crIssn) {
+        if (crId) {
           try {
-            res = await fetchCrossref(crIssn, j.name, floor, j.preprint, sinceCreated);
+            res = await fetchCrossref(crId, j.name, floor, j.preprint, sinceCreated);
           } catch(e) {
             res = await fetchOpenAlex(j.openalexIssn || j.openalexSourceId, j.name, floor, j.preprint, sinceCreated);
           }
@@ -5448,12 +5470,22 @@ async function runFetchAndScore() {
   // the PI to narrow the window when there was in fact room.
   allPapers = allPapers.filter(p => !dismissed.has(p.id));
 
-  // Hard cap: never score more than 1000 papers in a single run
+  // Hard cap: never send more than 1000 papers to scoring in a single run. A
+  // paper already scored by Sonnet, or already dropped by Haiku under the current
+  // threshold, costs nothing and does not count (see capUnresolvedPapers).
   const MAX_PAPERS_TOTAL = 1000;
-  let cappedDropped = {};
-  if (allPapers.length > MAX_PAPERS_TOTAL) {
-    const capped = capPapersFairly(allPapers, MAX_PAPERS_TOTAL);
-    cappedDropped = capped.droppedBySource;
+  const haikuThreshold = parseInt(document.getElementById('haiku-threshold').value)
+                       || HAIKU_THRESHOLD_DEFAULT;
+  const isResolved = p => {
+    if (scoreCache[`${p.id}|${fp}`] !== undefined) return true;
+    if (!haikusPrefilter) return false;
+    if (paperMatchesPriority(p.allAuthors || p.authors, prioritySet)) return false;
+    const h = haikuCache[`${p.id}|${fp}`];
+    return !!h && h.score <= haikuThreshold;
+  };
+  const capped = capUnresolvedPapers(allPapers, MAX_PAPERS_TOTAL, isResolved);
+  const cappedDropped = capped.droppedBySource;
+  if (Object.keys(cappedDropped).length) {
     const worst = Object.entries(capped.droppedBySource)
       .sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([k, n]) => `${k} −${n}`).join(', ');
@@ -5468,7 +5500,7 @@ async function runFetchAndScore() {
     const advice = arxivTrimmed
       ? 'If it persists, reduce "Fetch days back", or add terms to the arXiv.cs filter, to stay under the limit.'
       : 'If it persists, reduce "Fetch days back" to stay under the limit.';
-    runReport.push(`${allPapers.length} papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). ${advice}`);
+    runReport.push(`${capped.pending} unscored papers after dedup — capped at ${MAX_PAPERS_TOTAL}, trimming the most over-represented sources first (${worst}). ${advice}`);
     allPapers = capped.kept;
   }
   // One box for the whole run: the unreachable, partial and cap lines gathered
@@ -5533,8 +5565,6 @@ async function runFetchAndScore() {
   // scored it — so it used to be counted, and charged for, as though it were
   // about to be. On a re-run of a feed the prefilter mostly rejects, that is
   // the difference between "830 papers, ~$4.33" and a few dozen papers.
-  const haikuThreshold = parseInt(document.getElementById('haiku-threshold').value)
-                       || HAIKU_THRESHOLD_DEFAULT;
   let haikuNeed = [];              // no cached Haiku score: one Haiku call each
   let haikuSurvivors = [];         // already past the prefilter, or exempt from it
   let haikuPriorityBypassed = 0;
@@ -7127,7 +7157,7 @@ ${pageIcon()}
   <div class="doc-section" id="fetch">
     <h2>7. Fetch &amp; Score</h2>
     <p>Clicking <span class="ui-label">Fetch &amp; Score</span> runs the full pipeline:</p>
-    <p><strong>1. Fetch</strong> — Papers are pulled from each selected journal or arXiv category using the <em>Fetch days back</em> window. A progress bar shows each source as it loads. A source that fails is reported as a warning and the others still proceed; because a failed run does not advance the last-run clock, and arXiv is asked for an explicit window, the days it covered are requested again next time rather than being lost. A hard cap of <strong>1,000 papers</strong> is applied after fetching to prevent runaway runs.</p>
+    <p><strong>1. Fetch</strong> — Papers are pulled from each selected journal or arXiv category using the <em>Fetch days back</em> window. A progress bar shows each source as it loads. A source that fails is reported as a warning and the others still proceed; because a failed run does not advance the last-run clock, and arXiv is asked for an explicit window, the days it covered are requested again next time rather than being lost. A hard cap of <strong>1,000 papers</strong> still to be scored is applied after fetching to prevent runaway runs; papers already scored, or already dropped by Haiku, do not count against it, so a run that was capped scores the remainder next time.</p>
     <p><strong>2. Deduplicate</strong> — Papers appearing in multiple sources (e.g. a paper cross-listed on arXiv and indexed in OpenAlex) are deduplicated by DOI or a title+date fingerprint.</p>
     <p><strong>3. Abstract enrichment</strong> — Papers without an abstract are looked up against the Semantic Scholar batch API using their DOI. Semantic Scholar has broader publisher agreements than OpenAlex, so many abstracts that OpenAlex omits (e.g. from Nature Group or AAAS journals) can be recovered here. Abstracts filled in this step are used for both scoring and brief generation.</p>
     <p><strong>4. Score cache split</strong> — Papers already in the local score cache under your current profile are set aside and displayed immediately with their cached score and reason — no API call needed. Only uncached papers proceed to the next steps.</p>
